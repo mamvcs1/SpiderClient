@@ -75,7 +75,7 @@ class MainActivity : Activity() {
 
         scroll.addView(
             content,
-            ScrollView.LayoutParams(
+            LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
