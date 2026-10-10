@@ -9,25 +9,22 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.OvershootInterpolator
+import android.text.InputType
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.text.InputType
 
 class MainActivity : Activity() {
 
     private val black = Color.rgb(8, 8, 12)
-    private val panelColor = Color.rgb(19, 17, 24)
+    private val panel = Color.rgb(20, 17, 25)
     private val red = Color.rgb(255, 35, 65)
     private val white = Color.rgb(245, 245, 250)
-    private val gray = Color.rgb(150, 145, 160)
-    private val green = Color.rgb(75, 220, 145)
+    private val gray = Color.rgb(155, 150, 165)
 
     private lateinit var statusText: TextView
-    private lateinit var connectButton: GlassButton
-    private lateinit var disconnectButton: GlassButton
     private lateinit var configInput: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,32 +32,28 @@ class MainActivity : Activity() {
 
         window.statusBarColor = black
         window.navigationBarColor = black
-        window.decorView.systemUiVisibility = 0
 
-        createInterface()
+        buildUI()
     }
 
-    private fun createInterface() {
-
+    private fun buildUI() {
         val root = FrameLayout(this).apply {
             setBackgroundColor(black)
         }
 
-        val backgroundGlow = View(this).apply {
-            setBackground(
-                GradientDrawable(
-                    GradientDrawable.Orientation.TL_BR,
-                    intArrayOf(
-                        Color.rgb(65, 8, 24),
-                        black,
-                        black
-                    )
+        val glow = View(this).apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.rgb(75, 8, 28),
+                    black,
+                    black
                 )
             )
         }
 
         root.addView(
-            backgroundGlow,
+            glow,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 dp(360),
@@ -71,20 +64,19 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             clipToPadding = false
-            overScrollMode = View.OVER_SCROLL_NEVER
         }
 
-        val container = LinearLayout(this).apply {
+        val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(24), dp(24), dp(24), dp(28))
+            setPadding(dp(24), dp(24), dp(24), dp(30))
         }
 
         scroll.addView(
-            container,
+            content,
             ScrollView.LayoutParams(
-                ScrollView.LayoutParams.MATCH_PARENT,
-                ScrollView.LayoutParams.WRAP_CONTENT
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
 
@@ -98,8 +90,6 @@ class MainActivity : Activity() {
 
         setContentView(root)
 
-        // Logo
-
         val logo = TextView(this).apply {
             text = "SPIDER"
             textSize = 36f
@@ -112,17 +102,16 @@ class MainActivity : Activity() {
             )
         }
 
-        container.addView(
+        content.addView(
             logo,
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(62)
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(65)
             )
         )
 
         logo.alpha = 0f
         logo.translationY = dp(-15).toFloat()
-
         logo.animate()
             .alpha(1f)
             .translationY(0f)
@@ -130,59 +119,188 @@ class MainActivity : Activity() {
             .setInterpolator(OvershootInterpolator())
             .start()
 
-        // Subtitle
-
-        val subtitle = makeText(
+        val subtitle = text(
             "CLIENT  /  SECURE CONNECTION",
             10f,
             gray,
             Typeface.DEFAULT_BOLD
         )
 
-        subtitle.letterSpacing = 0.18f
+        subtitle.gravity = Gravity.CENTER
 
-        container.addView(
+        content.addView(
             subtitle,
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(30)
             )
         )
 
-        // Main status card
-
-        val statusCard = createCard()
+        val statusCard = card()
 
         statusCard.setPadding(
-            dp(20),
-            dp(20),
-            dp(20),
-            dp(20)
-        )
-
-        val cardTitle = makeText(
-            "CONNECTION STATUS",
-            11f,
-            gray,
-            Typeface.DEFAULT_BOLD
+            dp(18),
+            dp(16),
+            dp(18),
+            dp(16)
         )
 
         statusCard.addView(
-            cardTitle,
+            text("CONNECTION STATUS", 11f, gray, Typeface.DEFAULT_BOLD),
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(25)
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(26)
             )
         )
 
-        statusText = makeText(
+        statusText = text(
             "● DISCONNECTED",
             18f,
             red,
             Typeface.DEFAULT_BOLD
         )
 
-        statusText.gravity = Gravity.CENTER_VERTICAL
-
         statusCard.addView(
             statusText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(44)
+            )
+        )
+
+        statusCard.addView(
+            text(
+                "Ready to configure your connection",
+                12f,
+                gray
+            ),
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(25)
+            )
+        )
+
+        content.addView(
+            statusCard,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(28)
+            }
+        )
+
+        val configTitle = text(
+            "CONFIGURATION",
+            12f,
+            white,
+            Typeface.DEFAULT_BOLD
+        )
+
+        content.addView(
+            configTitle,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)
+            ).apply {
+                topMargin = dp(18)
+            }
+        )
+
+        configInput = EditText(this).apply {
+            hint = "Paste your configuration here..."
+            setHintTextColor(Color.rgb(105, 100, 115))
+            setTextColor(white)
+            textSize = 13f
+            gravity = Gravity.TOP or Gravity.START
+            inputType = InputType.TYPE_CLASS_TEXT or
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            minLines = 4
+            maxLines = 7
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(17, 15, 22))
+                cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), Color.rgb(75, 30, 45))
+            }
+        }
+
+        content.addView(
+            configInput,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(140)
+            )
+        )
+
+        val connect = GlassButton("⚡  CONNECT", red)
+
+        content.addView(
+            connect,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(58)
+            ).apply {
+                topMargin = dp(22)
+            }
+        )
+
+        connect.setOnClickListener {
+            press(connect)
+
+            if (configInput.text.toString().trim().isEmpty()) {
+                statusText.text = "● CONFIG REQUIRED"
+                statusText.setTextColor(red)
+            } else {
+                statusText.text = "● DEMO MODE"
+                statusText.setTextColor(
+                    Color.rgb(255, 190, 75)
+                )
+            }
+        }
+
+        val disconnect = GlassButton(
+            "DISCONNECT",
+            Color.rgb(100, 35, 50)
+        )
+
+        content.addView(
+            disconnect,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(52)
+            ).apply {
+                topMargin = dp(12)
+            }
+        )
+
+        disconnect.setOnClickListener {
+            press(disconnect)
+            statusText.text = "● DISCONNECTED"
+            statusText.setTextColor(red)
+        }
+
+        val info = card()
+        info.setPadding(dp(16), dp(14), dp(16), dp(14))
+
+        info.addView(
+            text("SPIDER SYSTEM", 12f, red, Typeface.DEFAULT_BOLD),
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(30)
+            )
+        )
+
+        info.addView(
+            text(
+                "Interface: Ready\nEngine: Not connected\nVPN Service: Not active",
+                12f,
+                gray
+            ).apply {
+                setLineSpacing(dp(5).toFloat(), 1f)
+            },
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP
