@@ -37,20 +37,18 @@ class MainActivity : Activity() {
     }
 
     private fun buildUI() {
-        val root = FrameLayout(this).apply {
-            setBackgroundColor(black)
-        }
+        val root = FrameLayout(this)
+        root.setBackgroundColor(black)
 
-        val glow = View(this).apply {
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(
-                    Color.rgb(75, 8, 28),
-                    black,
-                    black
-                )
+        val glow = View(this)
+        glow.background = GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            intArrayOf(
+                Color.rgb(75, 8, 28),
+                black,
+                black
             )
-        }
+        )
 
         root.addView(
             glow,
@@ -61,16 +59,19 @@ class MainActivity : Activity() {
             )
         )
 
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            clipToPadding = false
-        }
+        val scroll = ScrollView(this)
+        scroll.isFillViewport = true
+        scroll.clipToPadding = false
 
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(24), dp(24), dp(24), dp(30))
-        }
+        val content = LinearLayout(this)
+        content.orientation = LinearLayout.VERTICAL
+        content.gravity = Gravity.CENTER_HORIZONTAL
+        content.setPadding(
+            dp(24),
+            dp(24),
+            dp(24),
+            dp(30)
+        )
 
         scroll.addView(
             content,
@@ -90,17 +91,16 @@ class MainActivity : Activity() {
 
         setContentView(root)
 
-        val logo = TextView(this).apply {
-            text = "SPIDER"
-            textSize = 36f
-            letterSpacing = 0.20f
-            gravity = Gravity.CENTER
-            setTextColor(red)
-            typeface = Typeface.create(
-                "sans-serif-black",
-                Typeface.BOLD
-            )
-        }
+        val logo = TextView(this)
+        logo.text = "SPIDER"
+        logo.textSize = 36f
+        logo.letterSpacing = 0.20f
+        logo.gravity = Gravity.CENTER
+        logo.setTextColor(red)
+        logo.typeface = Typeface.create(
+            "sans-serif-black",
+            Typeface.BOLD
+        )
 
         content.addView(
             logo,
@@ -112,6 +112,7 @@ class MainActivity : Activity() {
 
         logo.alpha = 0f
         logo.translationY = dp(-15).toFloat()
+
         logo.animate()
             .alpha(1f)
             .translationY(0f)
@@ -119,13 +120,12 @@ class MainActivity : Activity() {
             .setInterpolator(OvershootInterpolator())
             .start()
 
-        val subtitle = text(
+        val subtitle = makeText(
             "CLIENT  /  SECURE CONNECTION",
             10f,
             gray,
             Typeface.DEFAULT_BOLD
         )
-
         subtitle.gravity = Gravity.CENTER
 
         content.addView(
@@ -136,8 +136,7 @@ class MainActivity : Activity() {
             )
         )
 
-        val statusCard = card()
-
+        val statusCard = createCard()
         statusCard.setPadding(
             dp(18),
             dp(16),
@@ -146,14 +145,19 @@ class MainActivity : Activity() {
         )
 
         statusCard.addView(
-            text("CONNECTION STATUS", 11f, gray, Typeface.DEFAULT_BOLD),
+            makeText(
+                "CONNECTION STATUS",
+                11f,
+                gray,
+                Typeface.DEFAULT_BOLD
+            ),
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(26)
             )
         )
 
-        statusText = text(
+        statusText = makeText(
             "● DISCONNECTED",
             18f,
             red,
@@ -169,7 +173,7 @@ class MainActivity : Activity() {
         )
 
         statusCard.addView(
-            text(
+            makeText(
                 "Ready to configure your connection",
                 12f,
                 gray
@@ -189,8 +193,7 @@ class MainActivity : Activity() {
                 topMargin = dp(28)
             }
         )
-
-        val configTitle = text(
+                val configTitle = makeText(
             "CONFIGURATION",
             12f,
             white,
@@ -248,7 +251,7 @@ class MainActivity : Activity() {
         )
 
         connect.setOnClickListener {
-            press(connect)
+            animatePress(connect)
 
             if (configInput.text.toString().trim().isEmpty()) {
                 statusText.text = "● CONFIG REQUIRED"
@@ -277,16 +280,21 @@ class MainActivity : Activity() {
         )
 
         disconnect.setOnClickListener {
-            press(disconnect)
+            animatePress(disconnect)
             statusText.text = "● DISCONNECTED"
             statusText.setTextColor(red)
         }
 
-        val info = card()
+        val info = createCard()
         info.setPadding(dp(16), dp(14), dp(16), dp(14))
 
         info.addView(
-            text("SPIDER SYSTEM", 12f, red, Typeface.DEFAULT_BOLD),
+            makeText(
+                "SPIDER SYSTEM",
+                12f,
+                red,
+                Typeface.DEFAULT_BOLD
+            ),
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(30)
@@ -294,8 +302,10 @@ class MainActivity : Activity() {
         )
 
         info.addView(
-            text(
-                "Interface: Ready\nEngine: Not connected\nVPN Service: Not active",
+            makeText(
+                "Interface: Ready\n" +
+                    "Engine: Not connected\n" +
+                    "VPN Service: Not active",
                 12f,
                 gray
             ).apply {
@@ -303,4 +313,130 @@ class MainActivity : Activity() {
             },
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        content.addView(
+            info,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(24)
+            }
+        )
+
+        val footer = makeText(
+            "SPIDER CLIENT  •  ANDROID",
+            10f,
+            Color.rgb(95, 85, 100),
+            Typeface.DEFAULT_BOLD
+        )
+        footer.gravity = Gravity.CENTER
+
+        content.addView(
+            footer,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(55)
+            )
+        )
+
+        content.alpha = 0f
+        content.translationY = dp(15).toFloat()
+
+        content.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(500)
+            .start()
+    } 
+        private fun createCard(): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+
+            background = GradientDrawable().apply {
+                setColor(panel)
+                cornerRadius = dp(20).toFloat()
+                setStroke(dp(1), Color.rgb(65, 28, 42))
+            }
+
+            elevation = dp(5).toFloat()
+        }
+    }
+
+    private fun makeText(
+        value: String,
+        size: Float,
+        color: Int,
+        typeface: Typeface = Typeface.DEFAULT
+    ): TextView {
+        return TextView(this).apply {
+            text = value
+            textSize = size
+            setTextColor(color)
+            this.typeface = typeface
+            gravity = Gravity.CENTER_VERTICAL
+        }
+    }
+
+    private fun animatePress(view: View) {
+        view.animate()
+            .scaleX(0.96f)
+            .scaleY(0.96f)
+            .setDuration(90)
+            .withEndAction {
+                view.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(120)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun dp(value: Int): Int {
+        return (
+            value * resources.displayMetrics.density
+        ).toInt()
+    }
+
+    inner class GlassButton(
+        label: String,
+        accent: Int
+    ) : TextView(this@MainActivity) {
+
+        init {
+            text = label
+            textSize = 14f
+            letterSpacing = 0.08f
+            gravity = Gravity.CENTER
+
+            setTextColor(white)
+
+            typeface = Typeface.create(
+                "sans-serif",
+                Typeface.BOLD
+            )
+
+            isClickable = true
+            isFocusable = true
+
+            val buttonBackground = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.rgb(65, 20, 35),
+                    Color.rgb(22, 15, 24),
+                    Color.rgb(35, 12, 22)
+                )
+            ).apply {
+                cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), accent)
+            }
+
+            setBackground(buttonBackground)
+            elevation = dp(5).toFloat()
+        }
+    }
+}
