@@ -106,7 +106,7 @@ class SpiderVpnService : VpnService() {
         tun = established
         val xrayConfig = JSONObject()
             .put("log", JSONObject().put("loglevel", "warning"))
-            .put("env", JSONObject().put("xray.tun.fd", established.fd))
+            .put("env", JSONObject().put("xray.tun.fd", established.fd.toString()))
             .put("inbounds", JSONArray().put(
                 JSONObject()
                     .put("tag", "spider-tun-in")
