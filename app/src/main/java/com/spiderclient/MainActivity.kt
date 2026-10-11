@@ -14,6 +14,8 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -316,7 +318,27 @@ class MainActivity : Activity() {
             .setAction(SpiderVpnService.ACTION_START)
             .putExtra(SpiderVpnService.EXTRA_RAW_CONFIG, raw)
         if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+        prefs.edit().putString("vpn_error", "").apply()
         toast(t("Starting Xray core…", "در حال راه‌اندازی هسته Xray…"))
+        Handler(Looper.getMainLooper()).postDelayed({ refreshVpnStatus(0) }, 1000)
+    }
+
+    private fun refreshVpnStatus(attempt: Int) {
+        if (isFinishing) return
+        if (prefs.getBoolean("vpn_connected", false)) {
+            render()
+            toast(t("Xray VPN connected.", "VPN با هسته Xray متصل شد."))
+            return
+        }
+        val error = prefs.getString("vpn_error", "").orEmpty()
+        if (error.isNotBlank()) {
+            render()
+            toast(error)
+            return
+        }
+        if (attempt < 20) {
+            Handler(Looper.getMainLooper()).postDelayed({ refreshVpnStatus(attempt + 1) }, 1000)
+        }
     }
 
     private fun showSubscriptionDialog() {
