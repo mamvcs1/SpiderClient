@@ -37,7 +37,7 @@ class SpiderVpnService : VpnService() {
     @Volatile private var running = false
 
     private val dialerController = object : DialerController {
-        override fun ProtectFd(fd: Int): Boolean = protect(fd)
+        override fun protectFd(fd: Int): Boolean = protect(fd)
     }
 
     override fun onCreate() {
