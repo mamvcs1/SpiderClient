@@ -254,18 +254,26 @@ class MainActivity : Activity() {
         if (currentTab == "myip" || currentTab == "home") render()
         io.execute {
             try {
-                val conn = java.net.URL("https://ipwho.is/").openConnection() as java.net.HttpURLConnection
+                val conn = java.net.URL("https://api.ipify.org?format=json").openConnection() as java.net.HttpURLConnection
                 conn.connectTimeout = 7000
                 conn.readTimeout = 7000
                 conn.requestMethod = "GET"
+                conn.setRequestProperty("Accept", "application/json")
                 val result = conn.inputStream.bufferedReader().use { it.readText() }
                 conn.disconnect()
                 val json = JSONObject(result)
-                if (json.optBoolean("success", true) && json.optString("ip").isNotBlank()) {
+                val ipValue = json.optString("ip")
+                if (ipValue.contains(":") || !ipValue.matches(Regex("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$"))) throw IllegalStateException("IPv4 unavailable")
+                val geoConn = java.net.URL("https://ipwho.is/$ipValue").openConnection() as java.net.HttpURLConnection
+                geoConn.connectTimeout = 7000
+                geoConn.readTimeout = 7000
+                val geoJson = JSONObject(geoConn.inputStream.bufferedReader().use { it.readText() })
+                geoConn.disconnect()
+                if (ipValue.isNotBlank() && geoJson.optBoolean("success", true)) {
                     runOnUiThread {
-                        publicIp = json.optString("ip")
-                        ipCountryCode = json.optString("country_code").uppercase()
-                        ipCountryName = json.optString("country")
+                        publicIp = ipValue
+                        ipCountryCode = geoJson.optString("country_code").uppercase()
+                        ipCountryName = geoJson.optString("country")
                         ipLoading = false
                         ipError = false
                         if (currentTab == "myip" || currentTab == "home") render()
