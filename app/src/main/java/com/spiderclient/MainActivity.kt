@@ -16,6 +16,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.animation.OvershootInterpolator
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
@@ -258,12 +260,12 @@ class MainActivity : Activity() {
             t("Scan QR code", "اسکن کد QR") to { explain(t("A QR scanner library is not configured yet.", "کتابخانه اسکن QR هنوز به پروژه اضافه نشده است.")) },
             t("Bulk import text", "واردکردن گروهی متن") to { showManualDialog(true) }
         )
-        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(4), 0, dp(4)) }
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(4), dp(4), dp(4), dp(4)) }
         options.forEach { (label, action) ->
             list.addView(smallButton(label + "   ›") { activePanelDismiss?.invoke(); action() },
-                LinearLayout.LayoutParams(-1, dp(48)).apply { setMargins(0, dp(3), 0, dp(3)) })
+                LinearLayout.LayoutParams(-1, dp(47)).apply { setMargins(0, dp(2), 0, dp(2)) })
         }
-        showInAppPanel(t("Add configuration", "افزودن پیکربندی"), list, listOf(t("Cancel", "لغو") to {}))
+        showPopover(t("Add configuration", "افزودن پیکربندی"), list, findViewById(android.R.id.content), maxHeightDp = 350)
     }
 
     private fun showManualDialog(bulk: Boolean) {
@@ -413,7 +415,7 @@ class MainActivity : Activity() {
             actions.addView(smallButton(label + "   ›") { activePanelDismiss?.invoke(); action() },
                 LinearLayout.LayoutParams(-1, dp(46)).apply { setMargins(0, dp(3), 0, dp(3)) })
         }
-        showInAppPanel(cfg.name, actions, listOf(t("Close", "بستن") to {}))
+        showPopover(cfg.name, actions, findViewById(android.R.id.content), maxHeightDp = 330)
     }
 
     private fun editConfig(cfg: Config) {
@@ -516,15 +518,15 @@ class MainActivity : Activity() {
                     setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.arrow_down_float, 0)
                     setOnClickListener {
                         val selected = optionValues.indexOf(text.toString()).let { if (it < 0) 0 else it }
-                        val choices = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
+                        val choices = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(4), dp(4), dp(4), dp(4)) }
                         optionValues.forEachIndexed { index, option ->
                             val shown = if (option.isBlank()) t("(empty)", "(خالی)") else option
                             choices.addView(smallButton((if (index == selected) "✓  " else "    ") + shown) {
                                 setText(option)
                                 selectorDismiss?.invoke()
-                            }, LinearLayout.LayoutParams(-1, dp(42)).apply { setMargins(0, dp(2), 0, dp(2)) })
+                            }, LinearLayout.LayoutParams(-1, dp(42)).apply { setMargins(0, dp(1), 0, dp(1)) })
                         }
-                        selectorDismiss = showInAppPanel(label, choices, listOf(t("Cancel", "لغو") to {}))
+                        selectorDismiss = showPopover(label, choices, this, maxHeightDp = 280)
                     }
                 }
             }
@@ -801,7 +803,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(14), dp(16), dp(12))
             background = panelDrawable(Color.rgb(19, 13, 18), 20, red, 1)
-            elevation = dp(18).toFloat()
+            elevation = 0f
             isClickable = true
         }
         val heading = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -833,6 +835,42 @@ class MainActivity : Activity() {
         overlay.addView(frame, FrameLayout.LayoutParams(-1, -1))
         decor.addView(overlay, ViewGroup.LayoutParams(-1, -1))
         return dismissAction
+    }
+
+
+    private fun showPopover(title: String, body: View, anchor: View, maxHeightDp: Int = 320): () -> Unit {
+        activePanelDismiss?.invoke()
+        val decor=window.decorView as ViewGroup
+        val overlay=FrameLayout(this).apply { setBackgroundColor(Color.TRANSPARENT); isClickable=true }
+        val popup=LinearLayout(this).apply {
+            orientation=LinearLayout.VERTICAL; setPadding(dp(10),dp(9),dp(10),dp(9))
+            background=panelDrawable(Color.rgb(20,12,18),16,red,1); elevation=0f
+            alpha=0f; scaleX=.88f; scaleY=.88f; isClickable=true
+        }
+        popup.addView(text(title,14f,red,true),LinearLayout.LayoutParams(-1,-2)); space(popup,5)
+        val scroller=ScrollView(this).apply { isFillViewport=false; overScrollMode=View.OVER_SCROLL_NEVER; addView(body,ViewGroup.LayoutParams(-1,-2)) }
+        popup.addView(scroller,LinearLayout.LayoutParams(-1,dp(maxHeightDp)))
+        lateinit var dismiss:()->Unit
+        dismiss={
+            popup.animate().alpha(0f).scaleX(.9f).scaleY(.9f).setDuration(100).withEndAction { if(overlay.parent!=null) (overlay.parent as? ViewGroup)?.removeView(overlay) }.start()
+            if(activePanelDismiss===dismiss) activePanelDismiss=null
+            if(selectorDismiss===dismiss) selectorDismiss=null
+        }
+        activePanelDismiss=dismiss
+        overlay.setOnClickListener { dismiss() }
+        popup.setOnClickListener { }
+        val pos=IntArray(2); val decorPos=IntArray(2); anchor.getLocationOnScreen(pos); decor.getLocationOnScreen(decorPos)
+        val screenW=resources.displayMetrics.widthPixels; val width=minOf(screenW-dp(24),dp(320))
+        val ax=if(anchor.width>0) pos[0]+anchor.width/2 else screenW/2
+        val ay=if(anchor.height>0) pos[1]+anchor.height else decorPos[1]+dp(70)
+        val maxY=(resources.displayMetrics.heightPixels-dp(maxHeightDp+90)).coerceAtLeast(dp(24))
+        val lp=FrameLayout.LayoutParams(width,ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.TOP or Gravity.START).apply {
+            leftMargin=(ax-width/2).coerceIn(dp(8),screenW-width-dp(8))
+            topMargin=(ay-decorPos[1]).coerceIn(dp(24),maxY)
+        }
+        overlay.addView(popup,lp); decor.addView(overlay,ViewGroup.LayoutParams(-1,-1))
+        popup.animate().alpha(1f).scaleX(1f).scaleY(1f).translationY(0f).setDuration(230).setInterpolator(OvershootInterpolator(.8f)).start()
+        return dismiss
     }
 
     private fun confirmDelete(cfg: Config) {
@@ -873,13 +911,30 @@ class MainActivity : Activity() {
     private fun button(label: String, action: () -> Unit): TextView =
         TextView(this).apply {
             text = label; textSize = 13f; setTextColor(white); gravity = Gravity.CENTER
-            background = glassDrawable(14, true)
+            background = glassDrawable(14, true); elevation = 0f
             setPadding(dp(10), dp(12), dp(10), dp(12)); isClickable = true; isFocusable = true
-            setOnClickListener { animate().scaleX(0.97f).scaleY(0.97f).setDuration(70).withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(90).start(); action() }.start() }
+            setOnTouchListener { v, e ->
+                when (e.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> { v.pivotX=e.x.coerceIn(0f,v.width.toFloat()); v.pivotY=e.y.coerceIn(0f,v.height.toFloat()); v.animate().cancel(); v.animate().scaleX(.975f).scaleY(.975f).rotationX(((e.y/v.height.coerceAtLeast(1))-.5f)*-5f).rotationY(((e.x/v.width.coerceAtLeast(1))-.5f)*5f).setDuration(100).start() }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).rotationX(0f).rotationY(0f).setDuration(260).setInterpolator(OvershootInterpolator(1.5f)).start()
+                }; false
+            }
+            setOnClickListener { action() }
         }
 
     private fun smallButton(label: String, action: () -> Unit): TextView =
-        TextView(this).apply { text = label; textSize = 11f; setTextColor(white); gravity = Gravity.CENTER; background = glassDrawable(10); isClickable = true; setOnClickListener { action() } }
+        TextView(this).apply {
+            text=label; textSize=11f; setTextColor(white); gravity=Gravity.CENTER
+            background=panelDrawable(Color.rgb(31,20,27),10,Color.argb(170,255,38,56),1); elevation=0f
+            isClickable=true; isFocusable=true
+            setOnTouchListener { v,e ->
+                when(e.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> { v.pivotX=e.x.coerceIn(0f,v.width.toFloat()); v.pivotY=e.y.coerceIn(0f,v.height.toFloat()); v.animate().cancel(); v.animate().scaleX(.97f).scaleY(.97f).rotationX(((e.y/v.height.coerceAtLeast(1))-.5f)*-4f).rotationY(((e.x/v.width.coerceAtLeast(1))-.5f)*4f).setDuration(90).start() }
+                    MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).rotationX(0f).rotationY(0f).setDuration(260).setInterpolator(OvershootInterpolator(1.6f)).start()
+                }; false
+            }
+            setOnClickListener { action() }
+        }
 
     private fun panel(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
