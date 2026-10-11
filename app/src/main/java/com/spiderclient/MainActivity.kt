@@ -45,15 +45,26 @@ class MainActivity : Activity() {
 
     private val configs = mutableListOf<String>()
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
 
-        window.statusBarColor = Color.rgb(8, 8, 8)
-        window.navigationBarColor = Color.rgb(8, 8, 8)
+    window.statusBarColor = Color.rgb(8, 8, 8)
+    window.navigationBarColor = Color.rgb(8, 8, 8)
 
+    try {
         createLayout()
         showHome()
+    } catch (e: Exception) {
+        AlertDialog.Builder(this)
+            .setTitle("Spider Client Error")
+            .setMessage(
+                "${e.javaClass.simpleName}: ${e.message}\n\n" +
+                e.stackTraceToString()
+            )
+            .setPositiveButton("OK", null)
+            .show()
     }
+}
 
     private fun createLayout() {
         root = LinearLayout(this).apply {
