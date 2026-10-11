@@ -29,6 +29,24 @@ jobs:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
           accept-android-sdk-licenses: true
 
+      - name: Download pinned official libXray Android artifact
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --output /tmp/libxray-android.zip \
+            https://github.com/XTLS/libXray/releases/download/v26.9.30/libxray-android.zip
+          echo "394b59d147b37ab46003bd3f1d687ed3b2f637cabfc0cb863f179c5a87bddde3  /tmp/libxray-android.zip" | sha256sum --check
+          mkdir -p /tmp/libxray-android app/libs
+          unzip -q /tmp/libxray-android.zip -d /tmp/libxray-android
+          AAR="$(find /tmp/libxray-android -type f -iname '*.aar' -print -quit)"
+          if [ -z "$AAR" ]; then
+            echo "::error::Pinned libXray release did not contain an Android AAR."
+            find /tmp/libxray-android -maxdepth 3 -type f | head -100
+            exit 1
+          fi
+          cp "$AAR" app/libs/libxray.aar
+          test -s app/libs/libxray.aar
+          echo "Pinned libXray Android AAR installed for Gradle."
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
