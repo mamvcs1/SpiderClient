@@ -470,12 +470,38 @@ class MainActivity : Activity() {
                 "Final mask raw json format (final mask object)" -> "{}"
                 else -> ""
             })
+            val optionValues = when (label) {
+                "Fingerprint" -> arrayOf("chrome", "firefox", "safari", "ios", "android", "edge", "random", "randomized", "")
+                "Network", "Transport" -> arrayOf("tcp", "ws", "grpc", "http", "httpupgrade", "xhttp", "kcp", "quic")
+                "Head type" -> arrayOf("none", "http")
+                "Tls" -> arrayOf("none", "tls", "reality")
+                "Encryption" -> arrayOf("none", "auto", "aes-128-gcm", "chacha20-poly1305")
+                "Flow" -> arrayOf("", "xtls-rprx-vision")
+                "Alpn" -> arrayOf("h2,http/1.1", "h2", "http/1.1", "h3", "")
+                else -> null
+            }
             val edit = EditText(this).apply {
                 setText(value); this.hint = hint; setTextColor(white); setHintTextColor(gray)
                 textSize = 13f; setPadding(dp(10), dp(8), dp(10), dp(8))
                 background = panelDrawable(Color.rgb(35, 27, 32), 10, Color.argb(150, 255, 38, 56), 1)
                 if (label.contains("raw json", true) || label == "Ech config list") minLines = 2 else setSingleLine(true)
                 inputType = if (label == "Port") android.text.InputType.TYPE_CLASS_NUMBER else android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                if (optionValues != null) {
+                    isFocusable = false
+                    isClickable = true
+                    setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.arrow_down_float, 0)
+                    setOnClickListener {
+                        val selected = optionValues.indexOf(text.toString()).let { if (it < 0) 0 else it }
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle(label)
+                            .setSingleChoiceItems(optionValues.map { if (it.isBlank()) t("(empty)", "(خالی)") else it }.toTypedArray(), selected) { dialog, which ->
+                                setText(optionValues[which])
+                                dialog.dismiss()
+                            }
+                            .setNegativeButton(t("Cancel", "لغو"), null)
+                            .show()
+                    }
+                }
             }
             edits[label] = edit
             box.addView(edit, LinearLayout.LayoutParams(-1, if (label.contains("raw json", true) || label == "Ech config list") dp(78) else dp(44)))
