@@ -319,7 +319,7 @@ class MainActivity : Activity() {
             .putExtra(SpiderVpnService.EXTRA_RAW_CONFIG, raw)
         if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
         prefs.edit().putString("vpn_error", "").apply()
-        toast(t("Starting Xray core…", "در حال راه‌اندازی هسته Xray…"))
+        toast(t("Test build: Xray core is not included.", "نسخه آزمایشی است؛ هسته Xray داخل آن نیست."))
         Handler(Looper.getMainLooper()).postDelayed({ refreshVpnStatus(0) }, 1000)
     }
 
