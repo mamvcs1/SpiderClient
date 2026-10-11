@@ -328,14 +328,131 @@ class MainActivity : Activity() {
     }
 
     private fun editConfig(cfg: Config) {
-        val name = EditText(this).apply { setText(cfg.name); hint = t("Name", "نام"); setTextColor(white) }
-        val raw = EditText(this).apply { setText(cfg.raw); hint = t("Configuration URI / JSON", "پیوند یا JSON پیکربندی"); minLines = 3; setTextColor(white) }
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0); addView(name); addView(raw) }
-        AlertDialog.Builder(this).setTitle(t("Edit configuration", "ویرایش پیکربندی")).setView(box)
-            .setNegativeButton(t("Cancel", "لغو"), null).setPositiveButton(t("Save", "ذخیره")) { _, _ ->
-                val newRaw = raw.text.toString().trim()
-                if (newRaw.isNotBlank()) { cfg.name = name.text.toString().trim().ifBlank { protocolOf(newRaw) }; cfg.raw = newRaw; saveConfigs(); render() }
-            }.show()
+        val source = cfg.raw
+        val initial = JSONObject()
+        try {
+            if (source.trim().startsWith("{")) {
+                val parsed = JSONObject(source)
+                if (parsed.has("spiderProfile")) {
+                    val profile = parsed.optJSONObject("spiderProfile") ?: JSONObject()
+                    val it = profile.keys()
+                    while (it.hasNext()) { val key = it.next(); initial.put(key, profile.opt(key)) }
+                } else {
+                    val it = parsed.keys()
+                    while (it.hasNext()) { val key = it.next(); initial.put(key, parsed.opt(key)) }
+                }
+            } else {
+                val uri = URI(source)
+                initial.put("Address", uri.host ?: "")
+                initial.put("Port", if (uri.port > 0) uri.port.toString() else when (uri.scheme?.lowercase()) { "https", "trojan", "vless", "vmess" -> "443"; "http" -> "80"; else -> "" })
+                val userInfo = uri.rawUserInfo.orEmpty()
+                initial.put("Id", userInfo.substringBefore(':', userInfo))
+                val query = uri.rawQuery.orEmpty().split("&").filter { it.isNotBlank() }
+                query.forEach { pair ->
+                    val k = java.net.URLDecoder.decode(pair.substringBefore("="), "UTF-8")
+                    val v = java.net.URLDecoder.decode(pair.substringAfter("=", ""), "UTF-8")
+                    val key = when (k.lowercase()) {
+                        "type", "network" -> "Network"
+                        "host" -> "Ws host"
+                        "path" -> "Ws path"
+                        "security" -> "Tls"
+                        "sni" -> "Sni"
+                        "fp" -> "Fingerprint"
+                        "alpn" -> "Alpn"
+                        "flow" -> "Flow"
+                        "encryption" -> "Encryption"
+                        "headerType" -> "Head type"
+                        else -> k
+                    }
+                    initial.put(key, v)
+                }
+            }
+        } catch (_: Exception) { }
+        val name = EditText(this).apply { setText(cfg.name); hint = t("Name", "نام"); setTextColor(white); setSingleLine(true) }
+        val fields = listOf(
+            "Remake" to "Remake", "Address" to "Address / IP / domain", "Port" to "1–65535",
+            "Id" to "UUID / user ID / password", "Flow" to "xtls-rprx-vision", "Encryption" to "none",
+            "Transport" to "tcp / ws / grpc / httpupgrade / xhttp", "Network" to "tcp / ws / grpc / ...",
+            "Head type" to "none / http", "Ws host" to "WebSocket Host header",
+            "Ws path" to "/path", "Final mask raw json format (final mask object)" to "{ }",
+            "Tls" to "none / tls / reality", "Sni" to "server name indication",
+            "Fingerprint" to "chrome / firefox / safari / random", "Alpn" to "h2,http/1.1",
+            "Ech config list" to "One ECH config per line or JSON list",
+            "Certificate fingerprint (SHA-256)" to "SHA-256 certificate pin",
+            "Fragment" to "Fragment options (core-dependent)", "Sni spoofing" to "SNI override (core-dependent)"
+        )
+        val edits = linkedMapOf<String, EditText>()
+        val checks = linkedMapOf<String, android.widget.CheckBox>()
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(8), dp(18), dp(8))
+            layoutDirection = if (fa) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        }
+        box.addView(text(t("Profile name", "نام پروفایل"), 12f, gray, true))
+        box.addView(name, LinearLayout.LayoutParams(-1, dp(44)))
+        space(box, 8)
+        box.addView(text(t("Protocol fields", "فیلدهای پروتکل"), 15f, red, true))
+        box.addView(text(t("Values are saved to this profile. Support at connection time depends on the Xray core and protocol implementation.", "مقادیر در پروفایل ذخیره می‌شوند؛ پشتیبانی هنگام اتصال به هسته Xray و پیاده‌سازی پروتکل بستگی دارد."), 11f, gray))
+        space(box, 6)
+        fields.forEach { (label, hint) ->
+            box.addView(text(label, 12f, white, true))
+            val value = initial.optString(label, when (label) {
+                "Remake" -> protocolOf(source)
+                "Transport" -> initial.optString("Network", "")
+                "Network" -> "tcp"
+                "Tls" -> if (source.contains("security=tls")) "tls" else "none"
+                "Encryption" -> if (protocolOf(source) == "VLESS") "none" else ""
+                "Final mask raw json format (final mask object)" -> "{}"
+                else -> ""
+            })
+            val edit = EditText(this).apply {
+                setText(value); this.hint = hint; setTextColor(white); setHintTextColor(gray)
+                textSize = 13f; setPadding(dp(10), dp(8), dp(10), dp(8))
+                background = panelDrawable(Color.rgb(35, 27, 32), 10, Color.argb(150, 255, 38, 56), 1)
+                if (label.contains("raw json", true) || label == "Ech config list") minLines = 2 else setSingleLine(true)
+                inputType = if (label == "Port") android.text.InputType.TYPE_CLASS_NUMBER else android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            }
+            edits[label] = edit
+            box.addView(edit, LinearLayout.LayoutParams(-1, if (label.contains("raw json", true) || label == "Ech config list") dp(78) else dp(44)))
+            space(box, 5)
+        }
+        listOf("Allow insercure", "Verify peer cert by name").forEach { label ->
+            val check = android.widget.CheckBox(this).apply {
+                text = label; setTextColor(white); buttonTintList = android.content.res.ColorStateList.valueOf(red)
+                isChecked = initial.optBoolean(label, initial.optBoolean(if (label == "Allow insercure") "allowInsecure" else "verifyPeerCertByName", false))
+            }
+            checks[label] = check
+            box.addView(check)
+        }
+        val scroll = ScrollView(this).apply { isFillViewport = true; addView(box) }
+        val dialog = AlertDialog.Builder(this).setTitle(t("Edit protocol profile", "ویرایش پروفایل پروتکل")).setView(scroll)
+            .setNegativeButton(t("Cancel", "لغو"), null)
+            .setPositiveButton(t("Save", "ذخیره")) { _, _ ->
+                val address = edits["Address"]?.text?.toString()?.trim().orEmpty()
+                val portText = edits["Port"]?.text?.toString()?.trim().orEmpty()
+                val port = portText.toIntOrNull()
+                if (address.isBlank() || port == null || port !in 1..65535) {
+                    toast(t("Enter a valid address and port (1–65535).", "نشانی معتبر و پورت ۱ تا ۶۵۵۳۵ وارد کنید."))
+                    return@setPositiveButton
+                }
+                val profile = JSONObject()
+                fields.forEach { (label, _) -> profile.put(label, edits[label]?.text?.toString()?.trim().orEmpty()) }
+                checks.forEach { (label, check) -> profile.put(label, check.isChecked) }
+                profile.put("protocol", edits["Remake"]?.text?.toString()?.trim().orEmpty().ifBlank { protocolOf(source) })
+                profile.put("source", source)
+                val stored = JSONObject().put("protocol", profile.optString("protocol"))
+                    .put("address", address).put("port", port).put("spiderProfile", profile)
+                cfg.name = name.text.toString().trim().ifBlank { profile.optString("protocol") }
+                cfg.raw = stored.toString()
+                saveConfigs()
+                render()
+                toast(t("Profile saved. Core-specific options are stored but not all are active until core integration.", "پروفایل ذخیره شد. گزینه‌های وابسته به هسته ذخیره می‌شوند، اما تا یکپارچه‌سازی هسته همگی فعال نیستند."))
+            }.create()
+        dialog.setOnShowListener {
+            dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.92).toInt(), (resources.displayMetrics.heightPixels * 0.82).toInt())
+        }
+        dialog.show()
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.92).toInt(), (resources.displayMetrics.heightPixels * 0.82).toInt())
     }
 
     private fun pingAll() {
