@@ -11,8 +11,8 @@ android {
         applicationId = "com.spiderclient"
         minSdk = 23
         targetSdk = 28
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     compileOptions {
@@ -22,6 +22,28 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+
+    signingConfigs {
+        create("stable") {
+            val keystoreFile = rootProject.file("spider-release.jks")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("SPIDER_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("SPIDER_KEY_ALIAS") ?: "spiderclient"
+                keyPassword = System.getenv("SPIDER_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            val keystoreFile = rootProject.file("spider-release.jks")
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("stable")
+            }
+        }
     }
 
     buildFeatures {
