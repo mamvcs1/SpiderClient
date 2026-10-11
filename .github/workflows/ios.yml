@@ -57,6 +57,8 @@ jobs:
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
+            -arch arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             -derivedDataPath /tmp/spider-ios-derived \
             CODE_SIGNING_ALLOWED=NO \
             build
