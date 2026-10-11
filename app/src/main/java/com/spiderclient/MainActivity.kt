@@ -12,6 +12,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.net.VpnService
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -44,6 +45,7 @@ class MainActivity : Activity() {
     private var pinging = false
     private var transitionBusy = false
     private var activePingId = ""
+    private val vpnRequestCode = 42
     private data class Config(val id: String, var name: String, var raw: String, var ping: String = "—")
     private val configs = mutableListOf<Config>()
 
@@ -169,13 +171,28 @@ class MainActivity : Activity() {
         val shield = ImageView(this).apply { setImageResource(R.drawable.ic_shield); setColorFilter(red) }
         card.addView(shield, LinearLayout.LayoutParams(dp(38), dp(38)))
         space(card, 7)
-        card.addView(text(t("DISCONNECTED", "قطع اتصال"), 19f, white, true))
+        val isConnected = prefs.getBoolean("vpn_connected", false)
+        card.addView(text(if (isConnected) t("CONNECTED", "متصل") else t("DISCONNECTED", "قطع اتصال"), 19f, if (isConnected) green else white, true))
         space(card, 4)
         val active = configs.firstOrNull { it.id == selectedId }
         card.addView(text(active?.name ?: t("No configuration selected", "پیکربندی انتخاب نشده"), 12f, gray))
         space(card, 12)
-        card.addView(button(t("CONNECT", "اتصال")) {
-            toast(t("Real VPN is not enabled yet. The Xray/VpnService connection must be completed first.", "اتصال واقعی VPN هنوز فعال نیست؛ ابتدا باید Xray و VpnService تکمیل شوند."))
+        card.addView(button(if (isConnected) t("DISCONNECT", "قطع اتصال") else t("CONNECT", "اتصال")) {
+            if (prefs.getBoolean("vpn_connected", false)) {
+                startService(Intent(this, SpiderVpnService::class.java).setAction(SpiderVpnService.ACTION_STOP))
+                prefs.edit().putBoolean("vpn_connected", false).apply()
+                render()
+            } else {
+                val selected = configs.firstOrNull { it.id == selectedId }
+                if (selected == null) {
+                    toast(t("Select or add a configuration first.", "ابتدا یک پیکربندی انتخاب یا اضافه کنید."))
+                } else {
+                    pendingVpnRaw = selected.raw
+                    val permission = VpnService.prepare(this)
+                    if (permission != null) startActivityForResult(permission, vpnRequestCode)
+                    else startVpnService()
+                }
+            }
         })
         space(content, 12)
         val info = panel()
@@ -186,7 +203,7 @@ class MainActivity : Activity() {
         detail(info, t("Selected server", "سرور انتخاب‌شده"), active?.let { maskedAddress(it.raw) } ?: "—")
         detail(info, t("Last ping", "آخرین پینگ"), active?.ping ?: "—")
         space(content, 8)
-        content.addView(text(t("Connection is currently a UI prototype; no active tunnel is claimed.", "اتصال در حال حاضر نمونه رابط کاربری است؛ تونل فعال ادعا نمی‌شود."), 11f, gray))
+        content.addView(text(t("Powered by Xray-core. Connection is shown only when the core reports a running state.", "مبتنی بر Xray-core؛ اتصال فقط پس از اجرای واقعی هسته نمایش داده می‌شود."), 11f, gray))
     }
 
     private fun showConfigs() {
@@ -278,11 +295,28 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated by Android but works on supported versions")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == vpnRequestCode) {
+            if (resultCode == RESULT_OK) startVpnService()
+            else toast(t("VPN permission was not granted.", "مجوز VPN داده نشد."))
+            return
+        }
         if (requestCode == 41 && resultCode == RESULT_OK) {
             val uri: Uri = data?.data ?: return
             try { contentResolver.openInputStream(uri)?.bufferedReader()?.use { addConfigText(it.readText(), true) } }
             catch (e: Exception) { toast(t("Could not read that file", "خواندن فایل ممکن نشد")) }
         }
+    }
+
+    private var pendingVpnRaw: String = ""
+
+    private fun startVpnService() {
+        val raw = pendingVpnRaw
+        if (raw.isBlank()) return
+        val intent = Intent(this, SpiderVpnService::class.java)
+            .setAction(SpiderVpnService.ACTION_START)
+            .putExtra(SpiderVpnService.EXTRA_RAW_CONFIG, raw)
+        if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+        toast(t("Starting Xray core…", "در حال راه‌اندازی هسته Xray…"))
     }
 
     private fun showSubscriptionDialog() {
