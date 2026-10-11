@@ -1,0 +1,49 @@
+name: SpiderClient
+options:
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    CODE_SIGNING_ALLOWED: "NO"
+targets:
+  SpiderClient:
+    type: application
+    platform: iOS
+    sources:
+      - path: SpiderClient
+    dependencies:
+      - target: SpiderTunnel
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.spiderclient.ios
+        PRODUCT_NAME: Spider Client
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Spider Client
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: NO
+        SWIFT_EMIT_LOC_STRINGS: YES
+  SpiderTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SpiderTunnel
+    dependencies:
+      - framework: Vendor/LibXray.xcframework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.spiderclient.ios.tunnel
+        PRODUCT_NAME: SpiderTunnel
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Spider Tunnel
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+        INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).PacketTunnelProvider"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: SpiderTunnel/SpiderTunnel.entitlements
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
