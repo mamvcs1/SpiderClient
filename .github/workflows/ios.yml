@@ -1,0 +1,77 @@
+name: Build Spider Client iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-simulator:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Xcode
+        run: xcodebuild -version
+
+      - name: Download pinned libXray Apple framework
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --output /tmp/libxray-apple.zip \
+            https://github.com/XTLS/libXray/releases/download/v26.9.30/libxray-apple-cgo.zip
+          echo "91343cd7542f85dffb17c9e273f0afde207b0004aa49848949e69e4c12450f80  /tmp/libxray-apple.zip" | shasum -a 256 --check
+          mkdir -p /tmp/libxray-apple ios/Vendor
+          unzip -q /tmp/libxray-apple.zip -d /tmp/libxray-apple
+          FRAMEWORK="$(find /tmp/libxray-apple -type d -name 'LibXray.xcframework' -print -quit)"
+          if [ -z "$FRAMEWORK" ]; then
+            echo "::error::Pinned libXray Apple release did not contain LibXray.xcframework."
+            find /tmp/libxray-apple -maxdepth 4 -print | head -100
+            exit 1
+          fi
+          cp -R "$FRAMEWORK" ios/Vendor/LibXray.xcframework
+          echo "Using framework: $FRAMEWORK"
+          find ios/Vendor/LibXray.xcframework -maxdepth 2 -type d -print
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build iOS Simulator app
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project SpiderClient.xcodeproj \
+            -scheme SpiderClient \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath /tmp/spider-ios-derived \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package simulator build
+        run: |
+          set -euo pipefail
+          APP="/tmp/spider-ios-derived/Build/Products/Debug-iphonesimulator/Spider Client.app"
+          test -d "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" SpiderClient-iOS-Simulator.zip
+
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpiderClient-iOS-Simulator
+          path: SpiderClient-iOS-Simulator.zip
+          if-no-files-found: error
+          retention-days: 14
