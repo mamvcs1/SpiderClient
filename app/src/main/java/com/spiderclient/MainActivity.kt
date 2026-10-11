@@ -767,6 +767,73 @@ class MainActivity : Activity() {
         space(content, 7)
     }
 
+
+    private var activePanelDismiss: (() -> Unit)? = null
+    private var selectorDismiss: (() -> Unit)? = null
+
+    /** Custom black/red in-app modal surface for app-owned menus and forms. */
+    private fun showInAppPanel(title: String, body: View?, actions: List<Pair<String, () -> Unit>>): () -> Unit {
+        activePanelDismiss?.invoke()
+        val decor = window.decorView as ViewGroup
+        val overlay = FrameLayout(this).apply {
+            setBackgroundColor(Color.argb(205, 0, 0, 0))
+            isClickable = true
+            isFocusable = true
+        }
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(12))
+            background = panelDrawable(Color.rgb(19, 13, 18), 20, red, 1)
+            elevation = dp(18).toFloat()
+            isClickable = true
+        }
+        val heading = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        heading.addView(text(title, 17f, white, true), LinearLayout.LayoutParams(0, -2, 1f))
+        heading.addView(smallButton("✕") { activePanelDismiss?.invoke() }, LinearLayout.LayoutParams(dp(40), dp(38)))
+        panel.addView(heading)
+        space(panel, 10)
+        if (body != null) panel.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
+        space(panel, 10)
+        val actionRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        actions.forEachIndexed { index, item ->
+            actionRow.addView(button(item.first) {
+                activePanelDismiss?.invoke()
+                item.second()
+            }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { if (index > 0) setMargins(dp(6), 0, 0, 0) })
+        }
+        panel.addView(actionRow)
+        lateinit var dismissAction: () -> Unit
+        dismissAction = {
+            if (overlay.parent != null) (overlay.parent as? ViewGroup)?.removeView(overlay)
+            if (activePanelDismiss === dismissAction) activePanelDismiss = null
+        }
+        activePanelDismiss = dismissAction
+        overlay.setOnClickListener { dismissAction() }
+        val frame = FrameLayout(this).apply {
+            setPadding(dp(18), dp(24), dp(18), dp(24))
+            addView(panel, FrameLayout.LayoutParams(-1, minOf((resources.displayMetrics.heightPixels * 0.84f).toInt(), dp(720)), Gravity.CENTER))
+        }
+        overlay.addView(frame, FrameLayout.LayoutParams(-1, -1))
+        decor.addView(overlay, ViewGroup.LayoutParams(-1, -1))
+        return dismissAction
+    }
+
+    private fun confirmDelete(cfg: Config) {
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(text(t("Delete this configuration? This cannot be undone.", "این پیکربندی حذف شود؟ این کار قابل بازگشت نیست."), 13f, white))
+        }
+        showInAppPanel(t("Confirm deletion", "تأیید حذف"), body, listOf(
+            t("Cancel", "لغو") to {},
+            t("Delete", "حذف") to {
+                configs.remove(cfg)
+                if (selectedId == cfg.id) selectedId = configs.firstOrNull()?.id ?: ""
+                saveConfigs()
+                render()
+            }
+        ))
+    }
+
     private fun explain(message: String) {
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
