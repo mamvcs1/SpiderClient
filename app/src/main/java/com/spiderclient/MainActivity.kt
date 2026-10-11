@@ -224,7 +224,7 @@ class MainActivity : Activity() {
         detail(info, t("Selected server", "سرور انتخاب‌شده"), active?.let { maskedAddress(it.raw) } ?: "—")
         detail(info, t("Last ping", "آخرین پینگ"), active?.ping ?: "—")
         space(content, 8)
-        content.addView(text(t("UI test build: Xray core is temporarily excluded, so real VPN connections are unavailable.", "نسخه آزمایشی رابط کاربری: هسته Xray موقتاً حذف شده، بنابراین اتصال واقعی VPN در دسترس نیست."), 11f, gray))
+        content.addView(text(t("Xray core runs inside Android VpnService and routes IPv4 traffic through the selected server.", "هسته Xray در سرویس VPN اندروید اجرا می‌شود و ترافیک IPv4 را از سرور انتخاب‌شده عبور می‌دهد."), 11f, gray))
     }
 
 
@@ -413,7 +413,6 @@ class MainActivity : Activity() {
             .putExtra(SpiderVpnService.EXTRA_RAW_CONFIG, raw)
         if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
         prefs.edit().putString("vpn_error", "").apply()
-        toast(t("Xray core is not included in this test version.", "این نسخه آزمایشی فعلاً هسته Xray ندارد."))
         Handler(Looper.getMainLooper()).postDelayed({ refreshVpnStatus(0) }, 1000)
     }
 
@@ -872,8 +871,8 @@ class MainActivity : Activity() {
         setting(t("Clear ping history", "پاک‌کردن سابقه پینگ"), t("Reset saved ping values", "بازنشانی مقادیر پینگ ذخیره‌شده")) {
             configs.forEach { it.ping = "—" }; saveConfigs(); render()
         }
-        setting(t("Connection mode", "حالت اتصال"), t("Core not integrated", "هسته هنوز یکپارچه نشده")) {
-            explain(t("The project contains the UI and configuration management, but a working Xray core + Android VpnService connection is not yet wired up. The Connect button will not fake a connected status.", "پروژه رابط کاربری و مدیریت پیکربندی دارد، اما اتصال واقعی Xray و Android VpnService هنوز متصل نشده است. دکمه اتصال وضعیت جعلی نمایش نمی‌دهد."))
+        setting(t("Connection mode", "حالت اتصال"), t("Xray + Android TUN", "هسته هنوز یکپارچه نشده")) {
+            explain(t("Spider Client uses the official libXray runtime with Android VpnService TUN routing. Connection status is only set after libXray accepts the start request.", "اسپایدر کلاینت از هسته رسمی libXray و تونل TUN اندروید استفاده می‌کند. وضعیت اتصال پس از پذیرش درخواست شروع توسط هسته ثبت می‌شود."))
         }
         setting(t("About Spider Client", "درباره اسپایدر کلاینت"), "1.0.0") {
             explain(t("Spider Client • version 1.0.0\nConfiguration links are stored locally. TCP ping tests server reachability only.", "اسپایدر کلاینت • نسخه ۱.۰.۰\nپیوندهای پیکربندی محلی ذخیره می‌شوند. پینگ TCP فقط دسترسی سرور را می‌سنجد."))
