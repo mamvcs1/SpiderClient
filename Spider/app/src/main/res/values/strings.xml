@@ -1,7 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Spider Client</string>
 
-    <string name="app_name">Spider</string>
-    <string name="hello_world">Hello world!</string>
+    <string name="tab_home">Home</string>
+    <string name="tab_configs">Configs</string>
+    <string name="tab_settings">Settings</string>
 
-</resources>
+    <string name="connection_status">Connection Status</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="connecting">Connecting...</string>
+
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+
+    <string name="active_config">Active Configuration</string>
+    <string name="no_config">No configuration selected</string>
+    <string name="add_config">Add Configuration</string>
+    <string name="import_config">Import Configuration</string>
+    <string name="paste_clipboard">Paste from Clipboard</string>
+    <string name="import_url">Import from URL</string>
+    <string name="scan_qr">Scan QR Code</string>
+    <string name="import_file">Import from File</string>
+
+    <string name="download">Download</string>
+    <string name="upload">Upload</string>
+    <string name="traffic">Traffic</string>
+    <string name="duration">Duration</string>
+    <string name="latency">Latency</string>
+
+    <string name="general">General</string>
+    <string name="network">Network</string>
+    <string name="appearance">Appearance</string>
+    <string name="language">Language</string>
+    <string name="dark_mode">Dark Mode</string>
+    <string name="light_mode">Light Mode</string>
+
+    <string name="device_id">Device ID</string>
+    <string name="copy">
