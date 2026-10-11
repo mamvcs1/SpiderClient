@@ -346,11 +346,24 @@ class MainActivity : Activity() {
     }
 
     private fun showSubscriptionDialog() {
-        val input = EditText(this).apply { hint = "https://"; setTextColor(white); setHintTextColor(gray) }
-        AlertDialog.Builder(this).setTitle(t("Subscription URL", "نشانی اشتراک")).setView(input)
-            .setNegativeButton(t("Cancel", "لغو"), null).setPositiveButton(t("Fetch", "دریافت")) { _, _ ->
+        val input = EditText(this).apply {
+            hint = "https://"
+            setTextColor(white); setHintTextColor(gray); textSize = 14f
+            background = panelDrawable(Color.rgb(35, 27, 32), 10, red, 1)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(2), dp(8), dp(2), dp(8))
+            addView(text(t("Enter a secure HTTPS subscription address.", "نشانی امن اشتراک با HTTPS را وارد کنید."), 12f, gray))
+            space(this, 8)
+            addView(input, LinearLayout.LayoutParams(-1, dp(48)))
+        }
+        showInAppPanel(t("Subscription URL", "نشانی اشتراک"), box, listOf(
+            t("Cancel", "لغو") to {},
+            t("Fetch", "دریافت") to {
                 val url = input.text.toString().trim()
-                if (!url.startsWith("https://")) { toast(t("Use a valid HTTPS URL", "نشانی HTTPS معتبر وارد کنید")); return@setPositiveButton }
+                if (!url.startsWith("https://")) { toast(t("Use a valid HTTPS URL", "نشانی HTTPS معتبر وارد کنید")); return@to }
                 io.execute {
                     try {
                         val conn = java.net.URL(url).openConnection()
@@ -359,7 +372,8 @@ class MainActivity : Activity() {
                         runOnUiThread { addConfigText(result, true) }
                     } catch (_: Exception) { runOnUiThread { toast(t("Subscription could not be downloaded", "دریافت اشتراک ناموفق بود")) } }
                 }
-            }.show()
+            }
+        ))
     }
 
     private fun addConfigText(value: String, multiple: Boolean) {
@@ -382,18 +396,25 @@ class MainActivity : Activity() {
     }
 
     private fun showConfigActions(cfg: Config) {
-        val items = arrayOf(t("Edit name / link", "ویرایش نام / پیوند"), t("Copy link", "کپی پیوند"), t("Share", "اشتراک‌گذاری"), t("Refresh ping", "تازه‌سازی پینگ"), t("Delete", "حذف"))
-        AlertDialog.Builder(this).setTitle(cfg.name).setItems(items) { _, which ->
-            when (which) {
-                0 -> editConfig(cfg)
-                1 -> { val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager; cm.setPrimaryClip(ClipData.newPlainText(cfg.name, cfg.raw)); toast(t("Copied", "کپی شد")) }
-                2 -> startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, cfg.raw), t("Share configuration", "اشتراک‌گذاری پیکربندی")))
-                3 -> pingOne(cfg)
-                4 -> AlertDialog.Builder(this).setMessage(t("Delete this configuration?", "این پیکربندی حذف شود؟")).setNegativeButton(t("Cancel", "لغو"), null).setPositiveButton(t("Delete", "حذف")) { _, _ ->
-                    configs.remove(cfg); if (selectedId == cfg.id) selectedId = configs.firstOrNull()?.id ?: ""; saveConfigs(); render()
-                }.show()
-            }
-        }.show()
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val items = listOf(
+            t("Edit name / link", "ویرایش نام / پیوند") to { editConfig(cfg) },
+            t("Copy link", "کپی پیوند") to {
+                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText(cfg.name, cfg.raw))
+                toast(t("Copied", "کپی شد"))
+            },
+            t("Share", "اشتراک‌گذاری") to {
+                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, cfg.raw), t("Share configuration", "اشتراک‌گذاری پیکربندی")))
+            },
+            t("Refresh ping", "تازه‌سازی پینگ") to { pingOne(cfg) },
+            t("Delete", "حذف") to { confirmDelete(cfg) }
+        )
+        items.forEach { (label, action) ->
+            actions.addView(smallButton(label + "   ›") { activePanelDismiss?.invoke(); action() },
+                LinearLayout.LayoutParams(-1, dp(46)).apply { setMargins(0, dp(3), 0, dp(3)) })
+        }
+        showInAppPanel(cfg.name, actions, listOf(t("Close", "بستن") to {}))
     }
 
     private fun editConfig(cfg: Config) {
@@ -496,14 +517,15 @@ class MainActivity : Activity() {
                     setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.arrow_down_float, 0)
                     setOnClickListener {
                         val selected = optionValues.indexOf(text.toString()).let { if (it < 0) 0 else it }
-                        AlertDialog.Builder(this@MainActivity)
-                            .setTitle(label)
-                            .setSingleChoiceItems(optionValues.map { if (it.isBlank()) t("(empty)", "(خالی)") else it }.toTypedArray(), selected) { dialog, which ->
-                                setText(optionValues[which])
-                                dialog.dismiss()
-                            }
-                            .setNegativeButton(t("Cancel", "لغو"), null)
-                            .show()
+                        val choices = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
+                        optionValues.forEachIndexed { index, option ->
+                            val shown = if (option.isBlank()) t("(empty)", "(خالی)") else option
+                            choices.addView(smallButton((if (index == selected) "✓  " else "    ") + shown) {
+                                setText(option)
+                                selectorDismiss?.invoke()
+                            }, LinearLayout.LayoutParams(-1, dp(42)).apply { setMargins(0, dp(2), 0, dp(2)) })
+                        }
+                        selectorDismiss = showInAppPanel(label, choices, listOf(t("Cancel", "لغو") to {}))
                     }
                 }
             }
