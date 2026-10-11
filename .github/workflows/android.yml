@@ -34,7 +34,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Configure stable APK signing
+        if: ${{ secrets.SPIDER_KEYSTORE_BASE64 != '' }}
+        env:
+          SPIDER_KEYSTORE_BASE64: ${{ secrets.SPIDER_KEYSTORE_BASE64 }}
+        run: |
+          echo "$SPIDER_KEYSTORE_BASE64" | base64 --decode > spider-release.jks
+
       - name: Build APK
+        env:
+          SPIDER_KEYSTORE_PASSWORD: ${{ secrets.SPIDER_KEYSTORE_PASSWORD }}
+          SPIDER_KEY_ALIAS: ${{ secrets.SPIDER_KEY_ALIAS }}
+          SPIDER_KEY_PASSWORD: ${{ secrets.SPIDER_KEY_PASSWORD }}
         run: gradle assembleDebug
 
       - name: Upload APK
