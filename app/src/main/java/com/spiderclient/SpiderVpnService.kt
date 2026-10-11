@@ -28,7 +28,7 @@ class SpiderVpnService : VpnService() {
     private val stopping = AtomicBoolean(false)
     private val prefs by lazy { getSharedPreferences("spider_client", MODE_PRIVATE) }
     private val dialerController = object : DialerController {
-        override fun protectFd(fd: Int): Boolean = this@SpiderVpnService.protect(fd)
+        override fun protectFd(fd: Long): Boolean = this@SpiderVpnService.protect(fd.toInt())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -47,6 +47,7 @@ class SpiderVpnService : VpnService() {
                     startForeground(NOTIFICATION_ID, notification("Starting Xray core…"))
                     Thread { startCore(raw) }.start()
                 }
+            }
         }
         return START_NOT_STICKY
     }
@@ -69,7 +70,6 @@ class SpiderVpnService : VpnService() {
             LibXray.registerDialerController(dialerController)
             LibXray.setDNS(dialerController, "8.8.8.8:53")
 
-            val escaped = JSONObject.quote(raw)
             val convertRequest = JSONObject()
                 .put("apiVersion", 3)
                 .put("method", "convertShareLinksToXrayJson")
@@ -101,7 +101,7 @@ class SpiderVpnService : VpnService() {
             }.start()
 
             var started = false
-            repeat(20) {
+            for (attempt in 0 until 20) {
                 if (stopping.get()) return
                 Thread.sleep(500)
                 val state = try {
@@ -113,7 +113,7 @@ class SpiderVpnService : VpnService() {
                 if (state.optBoolean("success", false) &&
                     state.optJSONObject("data")?.optBoolean("running", false) == true) {
                     started = true
-                    return@repeat
+                    break
                 }
             }
             if (!started) throw IllegalStateException("Xray core did not report a running state")
