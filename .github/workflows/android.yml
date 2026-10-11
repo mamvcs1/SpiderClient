@@ -37,11 +37,28 @@ jobs:
       - name: Configure stable APK signing
         env:
           SPIDER_KEYSTORE_BASE64: ${{ secrets.SPIDER_KEYSTORE_BASE64 }}
+          SPIDER_KEYSTORE_PASSWORD: ${{ secrets.SPIDER_KEYSTORE_PASSWORD }}
+          SPIDER_KEY_ALIAS: ${{ secrets.SPIDER_KEY_ALIAS }}
+          SPIDER_KEY_PASSWORD: ${{ secrets.SPIDER_KEY_PASSWORD }}
         run: |
-          if [ -n "$SPIDER_KEYSTORE_BASE64" ]; then
-            echo "$SPIDER_KEYSTORE_BASE64" | base64 --decode > spider-release.jks
+          set -euo pipefail
+          supplied=0
+          for name in SPIDER_KEYSTORE_BASE64 SPIDER_KEYSTORE_PASSWORD SPIDER_KEY_ALIAS SPIDER_KEY_PASSWORD; do
+            value="${!name:-}"
+            if [ -n "$value" ]; then supplied=$((supplied + 1)); fi
+          done
+
+          if [ "$supplied" -eq 4 ]; then
+            printf '%s' "$SPIDER_KEYSTORE_BASE64" | base64 --decode > spider-release.jks
+            test -s spider-release.jks
+            echo "SPIDER_STABLE_SIGNING=true" >> "$GITHUB_ENV"
+            echo "Stable signing key decoded. Gradle will sign with the persistent key."
+          elif [ "$supplied" -eq 0 ]; then
+            echo "SPIDER_STABLE_SIGNING=false" >> "$GITHUB_ENV"
+            echo "::warning::Persistent signing is not configured. This APK will use the Android debug key and is not suitable for seamless updates over builds signed with another key."
           else
-            echo "Stable signing key is not configured; building with the default debug key."
+            echo "::error::Signing secrets are incomplete. Configure all four SPIDER_* signing secrets, or remove all four to build a debug-signed test APK."
+            exit 1
           fi
 
       - name: Build APK
@@ -50,6 +67,20 @@ jobs:
           SPIDER_KEY_ALIAS: ${{ secrets.SPIDER_KEY_ALIAS }}
           SPIDER_KEY_PASSWORD: ${{ secrets.SPIDER_KEY_PASSWORD }}
         run: gradle assembleDebug
+
+      - name: Verify APK signature and report signing mode
+        env:
+          SPIDER_STABLE_SIGNING: ${{ env.SPIDER_STABLE_SIGNING }}
+        run: |
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)"
+          test -n "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          if [ "$SPIDER_STABLE_SIGNING" = "true" ]; then
+            echo "Signature verification passed. APK was built with the configured persistent signing key."
+          else
+            echo "::warning::Signature is valid, but it uses the debug key. Persistent update compatibility is NOT confirmed."
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
