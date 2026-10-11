@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="spider_black">#080808</color>
+    <color name="spider_background">#0D0D0F</color>
+    <color name="spider_surface">#18181C</color>
+    <color name="spider_surface_light">#242429</color>
+
+    <color name="spider_red">#FF2638</color>
+    <color name="spider_red_dark">#B80018</color>
+    <color name="spider_red_glow">#66FF2638</color>
+
+    <color name="spider_white">#FFFFFF</color>
+    <color name="spider_text">#F2F2F5</color>
+    <color name="spider_text_secondary">#A5A5AF</color>
+
+    <color name="spider_green">#35D49A</color>
+    <color name="spider_yellow">#FFC857</color>
+    <color name="spider_blue">#55A7FF</color>
+
+    <color name="spider_border">#33FFFFFF</color>
+    <color name="spider_overlay">#99000000</color>
+</resources>
