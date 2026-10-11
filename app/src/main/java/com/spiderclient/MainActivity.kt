@@ -1,7 +1,6 @@
 package com.spiderclient
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -542,15 +541,15 @@ class MainActivity : Activity() {
             box.addView(check)
         }
         val scroll = ScrollView(this).apply { isFillViewport = true; addView(box) }
-        val dialog = AlertDialog.Builder(this).setTitle(t("Edit protocol profile", "ویرایش پروفایل پروتکل")).setView(scroll)
-            .setNegativeButton(t("Cancel", "لغو"), null)
-            .setPositiveButton(t("Save", "ذخیره")) { _, _ ->
+        showInAppPanel(t("Edit protocol profile", "ویرایش پروفایل پروتکل"), scroll, listOf(
+            t("Cancel", "لغو") to {},
+            t("Save", "ذخیره") to {
                 val address = edits["Address"]?.text?.toString()?.trim().orEmpty()
                 val portText = edits["Port"]?.text?.toString()?.trim().orEmpty()
                 val port = portText.toIntOrNull()
                 if (address.isBlank() || port == null || port !in 1..65535) {
                     toast(t("Enter a valid address and port (1–65535).", "نشانی معتبر و پورت ۱ تا ۶۵۵۳۵ وارد کنید."))
-                    return@setPositiveButton
+                    return@to
                 }
                 val profile = JSONObject()
                 fields.forEach { (label, _) -> profile.put(label, edits[label]?.text?.toString()?.trim().orEmpty()) }
@@ -564,12 +563,8 @@ class MainActivity : Activity() {
                 saveConfigs()
                 render()
                 toast(t("Profile saved. Core-specific options are stored but not all are active until core integration.", "پروفایل ذخیره شد. گزینه‌های وابسته به هسته ذخیره می‌شوند، اما تا یکپارچه‌سازی هسته همگی فعال نیستند."))
-            }.create()
-        dialog.setOnShowListener {
-            dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.92).toInt(), (resources.displayMetrics.heightPixels * 0.82).toInt())
-        }
-        dialog.show()
-        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.92).toInt(), (resources.displayMetrics.heightPixels * 0.82).toInt())
+            }
+        ))
     }
 
     private fun pingAll() {
