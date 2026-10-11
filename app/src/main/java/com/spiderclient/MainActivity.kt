@@ -48,6 +48,11 @@ class MainActivity : Activity() {
     private var pinging = false
     private var transitionBusy = false
     private var activePingId = ""
+    private var publicIp = ""
+    private var ipCountryCode = ""
+    private var ipCountryName = ""
+    private var ipLoading = false
+    private var ipError = false
     private val vpnRequestCode = 42
     private data class Config(val id: String, var name: String, var raw: String, var ping: String = "—")
     private val configs = mutableListOf<Config>()
@@ -60,6 +65,7 @@ class MainActivity : Activity() {
         window.statusBarColor = Color.rgb(12, 8, 10)
         window.navigationBarColor = Color.rgb(12, 8, 10)
         render()
+        refreshPublicIp(false)
     }
 
     override fun onDestroy() {
@@ -132,6 +138,7 @@ class MainActivity : Activity() {
         when (currentTab) {
             "home" -> showHome()
             "configs" -> showConfigs()
+            "myip" -> showMyIp()
             else -> showSettings()
         }
         val nav = LinearLayout(this).apply {
@@ -142,6 +149,7 @@ class MainActivity : Activity() {
         }
         navItem(nav, "home", t("Home", "خانه"), R.drawable.ic_home)
         navItem(nav, "configs", t("Configs", "پیکربندی‌ها"), R.drawable.ic_configs)
+        navItem(nav, "myip", t("My IP", "آی‌پی من"), R.drawable.ic_shield)
         navItem(nav, "settings", t("Settings", "تنظیمات"), R.drawable.ic_settings)
         root.addView(nav, LinearLayout.LayoutParams(-1, dp(62)))
     }
@@ -179,6 +187,16 @@ class MainActivity : Activity() {
         space(card, 4)
         val active = configs.firstOrNull { it.id == selectedId }
         card.addView(text(active?.name ?: t("No configuration selected", "پیکربندی انتخاب نشده"), 12f, gray))
+        space(card, 7)
+        val ipRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        ipRow.addView(text(countryFlag(ipCountryCode), 24f, white, true), LinearLayout.LayoutParams(dp(38), -2))
+        val ipBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        ipBox.addView(text(t("PUBLIC IP", "آی‌پی عمومی"), 10f, gray, true))
+        ipBox.addView(text(if (publicIp.isNotBlank()) publicIp else if (ipLoading) t("Checking IP…", "در حال بررسی آی‌پی…") else "—", 15f, white, true))
+        if (ipCountryName.isNotBlank()) ipBox.addView(text(ipCountryName, 11f, gray))
+        ipRow.addView(ipBox, LinearLayout.LayoutParams(0, -2, 1f))
+        ipRow.addView(smallButton("↻") { refreshPublicIp(true) }, LinearLayout.LayoutParams(dp(44), dp(40)))
+        card.addView(ipRow)
         space(card, 12)
         card.addView(button(if (isConnected) t("DISCONNECT", "قطع اتصال") else t("CONNECT", "اتصال")) {
             if (prefs.getBoolean("vpn_connected", false)) {
@@ -207,6 +225,69 @@ class MainActivity : Activity() {
         detail(info, t("Last ping", "آخرین پینگ"), active?.ping ?: "—")
         space(content, 8)
         content.addView(text(t("UI test build: Xray core is temporarily excluded, so real VPN connections are unavailable.", "نسخه آزمایشی رابط کاربری: هسته Xray موقتاً حذف شده، بنابراین اتصال واقعی VPN در دسترس نیست."), 11f, gray))
+    }
+
+
+    private fun showMyIp() {
+        content.addView(text(t("My IP", "آی‌پی من"), 23f, white, true))
+        content.addView(text(t("Current public IP of this network", "آی‌پی عمومی فعلی این شبکه"), 12f, gray))
+        space(content, 14)
+        val card = panel().apply { gravity = Gravity.CENTER; setPadding(dp(18), dp(24), dp(18), dp(24)) }
+        content.addView(card)
+        card.addView(text(countryFlag(ipCountryCode), 42f, white, true))
+        space(card, 10)
+        card.addView(text(if (publicIp.isNotBlank()) publicIp else if (ipLoading) t("Checking…", "در حال بررسی…") else if (ipError) t("Could not get IP", "دریافت آی‌پی ناموفق بود") else "—", 21f, white, true))
+        if (ipCountryName.isNotBlank()) {
+            space(card, 5)
+            card.addView(text(ipCountryName, 13f, gray))
+        }
+        space(content, 12)
+        content.addView(button(if (ipLoading) t("Checking…", "در حال بررسی…") else t("↻  Refresh IP", "↻  تازه‌سازی آی‌پی")) {
+            refreshPublicIp(true)
+        })
+    }
+
+    private fun refreshPublicIp(showMessage: Boolean) {
+        if (ipLoading) return
+        ipLoading = true
+        ipError = false
+        if (currentTab == "myip" || currentTab == "home") render()
+        io.execute {
+            try {
+                val conn = java.net.URL("https://ipwho.is/").openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 7000
+                conn.readTimeout = 7000
+                conn.requestMethod = "GET"
+                val result = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                val json = JSONObject(result)
+                if (json.optBoolean("success", true) && json.optString("ip").isNotBlank()) {
+                    runOnUiThread {
+                        publicIp = json.optString("ip")
+                        ipCountryCode = json.optString("country_code").uppercase()
+                        ipCountryName = json.optString("country")
+                        ipLoading = false
+                        ipError = false
+                        if (currentTab == "myip" || currentTab == "home") render()
+                        if (showMessage) toast(t("IP refreshed", "آی‌پی تازه شد"))
+                    }
+                } else throw IllegalStateException("IP lookup failed")
+            } catch (_: Exception) {
+                runOnUiThread {
+                    ipLoading = false
+                    ipError = true
+                    if (currentTab == "myip" || currentTab == "home") render()
+                    if (showMessage) toast(t("Could not refresh IP. Check your internet connection.", "تازه‌سازی آی‌پی ناموفق بود؛ اتصال اینترنت را بررسی کنید."))
+                }
+            }
+        }
+    }
+
+    private fun countryFlag(code: String): String {
+        if (code.length != 2 || !code.all { it in 'A'..'Z' }) return "🌐"
+        val first = Character.codePointAt(code, 0) - 'A'.code + 0x1F1E6
+        val second = Character.codePointAt(code, 1) - 'A'.code + 0x1F1E6
+        return String(Character.toChars(first)) + String(Character.toChars(second))
     }
 
     private fun showConfigs() {
