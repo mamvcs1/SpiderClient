@@ -12,7 +12,7 @@ android {
         minSdk = 23
         targetSdk = 28
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
     }
 
     compileOptions {
@@ -22,6 +22,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 }
 
