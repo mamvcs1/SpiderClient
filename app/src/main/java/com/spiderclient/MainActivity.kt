@@ -559,7 +559,14 @@ class MainActivity : Activity() {
             "Fingerprint" to "chrome / firefox / safari / random", "Alpn" to "h2,http/1.1",
             "Ech config list" to "One ECH config per line or JSON list",
             "Certificate fingerprint (SHA-256)" to "SHA-256 certificate pin",
-            "Fragment" to "Fragment options (core-dependent)", "Sni spoofing" to "SNI override (core-dependent)"
+            "Fragment" to "Fragment options summary",
+            "Fragment packets" to "tlshello / 1-3",
+            "Fragment length" to "10-20",
+            "Fragment interval" to "1-1",
+            "Sni spoofing" to "SNI spoofing summary",
+            "SNI spoofing SNI" to "example.com",
+            "SNI spoofing destination" to "host:port (optional)",
+            "SNI spoofing mode" to "tls / reality"
         )
         val edits = linkedMapOf<String, EditText>()
         val checks = linkedMapOf<String, android.widget.CheckBox>()
@@ -593,6 +600,10 @@ class MainActivity : Activity() {
                 "Encryption" -> arrayOf("none", "auto", "aes-128-gcm", "chacha20-poly1305")
                 "Flow" -> arrayOf("", "xtls-rprx-vision")
                 "Alpn" -> arrayOf("h2,http/1.1", "h2", "http/1.1", "h3", "")
+                "Fragment packets" -> arrayOf("tlshello", "1-3", "1-5", "1-10", "")
+                "Fragment length" -> arrayOf("10-20", "1-3", "5-10", "10-30", "20-50", "")
+                "Fragment interval" -> arrayOf("1-1", "1-2", "1-3", "2-3", "")
+                "SNI spoofing mode" -> arrayOf("tls", "reality", "auto", "")
                 else -> null
             }
             val edit = EditText(this).apply {
@@ -623,10 +634,15 @@ class MainActivity : Activity() {
             box.addView(edit, LinearLayout.LayoutParams(-1, if (label.contains("raw json", true) || label == "Ech config list") dp(78) else dp(44)))
             space(box, 5)
         }
-        listOf("Allow insercure", "Verify peer cert by name").forEach { label ->
+        listOf("Fragment enabled", "SNI spoofing enabled", "Allow insercure", "Verify peer cert by name").forEach { label ->
             val check = android.widget.CheckBox(this).apply {
                 text = label; setTextColor(white); buttonTintList = android.content.res.ColorStateList.valueOf(red)
-                isChecked = initial.optBoolean(label, initial.optBoolean(if (label == "Allow insercure") "allowInsecure" else "verifyPeerCertByName", false))
+                isChecked = initial.optBoolean(label, when (label) {
+                    "Fragment enabled" -> initial.optString("Fragment").isNotBlank()
+                    "SNI spoofing enabled" -> initial.optString("Sni spoofing").isNotBlank()
+                    "Allow insercure" -> initial.optBoolean("allowInsecure", false)
+                    else -> initial.optBoolean("verifyPeerCertByName", false)
+                })
             }
             checks[label] = check
             box.addView(check)
