@@ -472,7 +472,7 @@ class MainActivity : Activity() {
         }
 
     private fun smallButton(label: String, action: () -> Unit): TextView =
-        TextView(this).apply { text = label; textSize = 11f; setTextColor(white); gravity = Gravity.CENTER; background = panelDrawable(Color.argb(150, 45, 31, 37), 10, Color.argb(120, red), 1); isClickable = true; setOnClickListener { action() } }
+        TextView(this).apply { text = label; textSize = 11f; setTextColor(white); gravity = Gravity.CENTER; background = panelDrawable(Color.argb(150, 45, 31, 37), 10, Color.argb(120, 255, 38, 56), 1); isClickable = true; setOnClickListener { action() } }
 
     private fun panel(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
