@@ -228,16 +228,45 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun refreshScreen() {
-        root.removeAllViews()
-        createLayout()
+private fun refreshScreen() {
+    root.removeAllViews()
 
-        when (currentTab) {
-            "Home" -> showHome()
-            "Configs" -> showConfigs()
-            "Settings" -> showSettings()
-        }
+    createHeader()
+
+    content = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
     }
+
+    val scroll = ScrollView(this).apply {
+        isFillViewport = true
+        clipToPadding = false
+
+        addView(
+            content,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+    }
+
+    root.addView(
+        scroll,
+        LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0,
+            1f
+        )
+    )
+
+    createBottomNavigation()
+
+    when (currentTab) {
+        "Home" -> showHome()
+        "Configs" -> showConfigs()
+        "Settings" -> showSettings()
+    }
+}
         private fun showHome() {
         content.removeAllViews()
 
