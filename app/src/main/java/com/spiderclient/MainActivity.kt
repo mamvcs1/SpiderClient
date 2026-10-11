@@ -43,6 +43,7 @@ class MainActivity : Activity() {
     private var selectedId = ""
     private var pinging = false
     private var transitionBusy = false
+    private var activePingId = ""
     private data class Config(val id: String, var name: String, var raw: String, var ping: String = "—")
     private val configs = mutableListOf<Config>()
 
@@ -222,6 +223,11 @@ class MainActivity : Activity() {
             actions.addView(smallButton(t("Ping", "پینگ")) { pingOne(cfg, card) }, LinearLayout.LayoutParams(0, dp(38), 1f).apply { setMargins(dp(5), 0, 0, 0) })
             actions.addView(smallButton("⋮") { showConfigActions(cfg) }, LinearLayout.LayoutParams(dp(42), dp(38)).apply { setMargins(dp(5), 0, 0, 0) })
             card.addView(actions)
+            if (activePingId == cfg.id) {
+                val ripple = WaterRippleView(this, Color.YELLOW, true)
+                card.addView(ripple, LinearLayout.LayoutParams(-1, dp(54)))
+                ripple.start { }
+            }
         }
     }
 
@@ -475,14 +481,14 @@ class MainActivity : Activity() {
 
     private fun pingOne(cfg: Config, rippleTarget: LinearLayout? = null) {
         cfg.ping = t("Checking…", "در حال بررسی…")
-        rippleTarget?.let { addWaterRipple(it, true) }
+        activePingId = cfg.id
         render()
         io.execute {
             val result = tcpPing(cfg.raw)
             runOnUiThread {
                 configs.firstOrNull { it.id == cfg.id }?.ping = result
+                activePingId = ""
                 saveConfigs()
-                if (rippleTarget != null) addWaterRipple(rippleTarget, false, result.contains("ms"))
                 render()
             }
         }
