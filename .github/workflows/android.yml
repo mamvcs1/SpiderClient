@@ -34,6 +34,16 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Download prebuilt libXray Android core
+        run: |
+          mkdir -p app/libs /tmp/libxray
+          curl --fail --location --retry 3 https://github.com/XTLS/libXray/releases/download/v26.9.30/libxray-android.zip --output /tmp/libxray/libxray-android.zip
+          unzip -q /tmp/libxray/libxray-android.zip -d /tmp/libxray/unpacked
+          AAR="$(find /tmp/libxray/unpacked -type f -name 'libXray.aar' -print -quit)"
+          test -n "$AAR"
+          cp "$AAR" app/libs/libXray.aar
+          ls -lh app/libs/libXray.aar
+
       - name: Build APK
         run: gradle assembleDebug
 
