@@ -156,6 +156,42 @@ class MainActivity : Activity() {
         navItem(nav, "myip", t("My IP", "آی‌پی من"), R.drawable.ic_shield)
         navItem(nav, "settings", t("Settings", "تنظیمات"), R.drawable.ic_settings)
         root.addView(nav, LinearLayout.LayoutParams(-1, dp(62)))
+        installMagneticEffects(root)
+    }
+
+    /** iOS-style pointer magnetism for mouse/trackpad users. */
+    private fun installMagneticEffects(parent: ViewGroup) {
+        for (i in 0 until parent.childCount) {
+            val child = parent.getChildAt(i)
+            if (child.isClickable || child.isFocusable) attachMagneticEffect(child)
+            if (child is ViewGroup) installMagneticEffects(child)
+        }
+    }
+
+    private fun attachMagneticEffect(view: View) {
+        if (view.getTag(R.id.magnetic_effect_attached) == true) return
+        view.setTag(R.id.magnetic_effect_attached, true)
+        view.setOnHoverListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE -> {
+                    val w = v.width.coerceAtLeast(1).toFloat()
+                    val h = v.height.coerceAtLeast(1).toFloat()
+                    val nx = (((event.x / w) - 0.5f) * 2f).coerceIn(-1f, 1f)
+                    val ny = (((event.y / h) - 0.5f) * 2f).coerceIn(-1f, 1f)
+                    v.animate().cancel()
+                    v.animate().translationX(nx * dp(4)).translationY(ny * dp(4))
+                        .rotationY(nx * 4f).rotationX(-ny * 4f)
+                        .scaleX(1.015f).scaleY(1.015f).setDuration(90).start()
+                }
+                MotionEvent.ACTION_HOVER_EXIT -> {
+                    v.animate().cancel()
+                    v.animate().translationX(0f).translationY(0f)
+                        .rotationX(0f).rotationY(0f).scaleX(1f).scaleY(1f)
+                        .setDuration(220).setInterpolator(OvershootInterpolator(1.1f)).start()
+                }
+            }
+            false
+        }
     }
 
     private fun navItem(parent: LinearLayout, key: String, label: String, iconRes: Int) {
@@ -1030,6 +1066,7 @@ class MainActivity : Activity() {
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).rotationX(0f).rotationY(0f).setDuration(260).setInterpolator(OvershootInterpolator(1.5f)).start()
                 }; false
             }
+            attachMagneticEffect(this)
             setOnClickListener { action() }
         }
 
@@ -1044,6 +1081,7 @@ class MainActivity : Activity() {
                     MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).rotationX(0f).rotationY(0f).setDuration(260).setInterpolator(OvershootInterpolator(1.6f)).start()
                 }; false
             }
+            attachMagneticEffect(this)
             setOnClickListener { action() }
         }
 
