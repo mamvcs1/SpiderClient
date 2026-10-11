@@ -668,15 +668,44 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun languageSetting() {
+        val card = panel().apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+        }
+        content.addView(card)
+        card.addView(text(t("Language", "زبان"), 14f, white, true))
+        card.addView(text(t("Choose the app language", "زبان برنامه را انتخاب کنید"), 11f, gray))
+        space(card, 10)
+        val choices = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        choices.addView(smallButton(if (!fa) "✓  English" else "English") {
+            if (fa) {
+                fa = false
+                prefs.edit().putBoolean("fa", false).apply()
+                render()
+            }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        choices.addView(smallButton(if (fa) "✓  فارسی" else "فارسی") {
+            if (!fa) {
+                fa = true
+                prefs.edit().putBoolean("fa", true).apply()
+                render()
+            }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+            setMargins(dp(8), 0, 0, 0)
+        })
+        card.addView(choices)
+        space(content, 7)
+    }
+
     private fun showSettings() {
         content.addView(text(t("Settings", "تنظیمات"), 23f, white, true))
         content.addView(text(t("Personalize Spider Client", "شخصی‌سازی اسپایدر کلاینت"), 12f, gray))
         space(content, 12)
-        setting(t("Language", "زبان"), if (fa) "فارسی" else "English") {
-            AlertDialog.Builder(this).setTitle(t("Language", "زبان")).setItems(arrayOf("English", "فارسی")) { _, which ->
-                fa = which == 1; prefs.edit().putBoolean("fa", fa).apply(); render()
-            }.show()
-        }
+        languageSetting()
         setting(t("Appearance", "ظاهر"), t("Black / red theme", "تم مشکی / قرمز")) {
             explain(t("The black and red theme is currently fixed. Glass blur effects depend on Android version and device support.", "تم مشکی و قرمز فعلاً ثابت است. افکت محوشدگی شیشه‌ای به نسخه اندروید و پشتیبانی دستگاه بستگی دارد."))
         }
