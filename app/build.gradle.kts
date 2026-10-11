@@ -52,6 +52,6 @@ android {
 }
 
 dependencies {
-
+    implementation(files("libs/libxray.aar"))
     implementation("androidx.appcompat:appcompat:1.7.0")
 }
