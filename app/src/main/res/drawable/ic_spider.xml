@@ -1,43 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="64dp"
-    android:height="64dp"
-    android:viewportWidth="64"
-    android:viewportHeight="64">
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
 
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FF2638"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M32,20 L32,44
-                          M24,24 L12,16
-                          M20,32 L8,32
-                          M24,40 L12,48
-                          M40,24 L52,16
-                          M44,32 L56,32
-                          M40,40 L52,48" />
+        android:fillColor="#FFFF2638"
+        android:pathData="M24,12
+        C18,12 14,17 14,23
+        C14,29 18,34 24,34
+        C30,34 34,29 34,23
+        C34,17 30,12 24,12 Z" />
 
     <path
-        android:fillColor="#FF2638"
-        android:pathData="M32,12
-                          C23,12 20,20 24,28
-                          L24,40
-                          C24,48 40,48 40,40
-                          L40,28
-                          C44,20 41,12 32,12 Z" />
+        android:fillColor="#FFFF2638"
+        android:pathData="M16,17 L7,11 L5,14 L14,21 Z
+        M12,24 L3,24 L3,28 L13,28 Z
+        M15,30 L7,37 L10,40 L19,33 Z
+        M32,17 L41,11 L43,14 L34,21 Z
+        M36,24 L45,24 L45,28 L35,28 Z
+        M33,30 L41,37 L38,40 L29,33 Z" />
 
-    <circle
-        android:fillColor="#FFFFFF"
-        android:cx="28"
-        android:cy="24"
-        android:radius="2" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,20
+        C18,18.9 18.9,18 20,18
+        C21.1,18 22,18.9 22,20
+        C22,21.1 21.1,22 20,22
+        C18.9,22 18,21.1 18,20 Z" />
 
-    <circle
-        android:fillColor="#FFFFFF"
-        android:cx="36"
-        android:cy="24"
-        android:radius="2" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M26,20
+        C26,18.9 26.9,18 28,18
+        C29.1,18 30,18.9 30,20
+        C30,21.1 29.1,22 28,22
+        C26.9,22 26,21.1 26,20 Z" />
 
 </vector>
