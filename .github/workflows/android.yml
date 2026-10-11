@@ -35,11 +35,14 @@ jobs:
           gradle-version: '8.9'
 
       - name: Configure stable APK signing
-        if: ${{ secrets.SPIDER_KEYSTORE_BASE64 != '' }}
         env:
           SPIDER_KEYSTORE_BASE64: ${{ secrets.SPIDER_KEYSTORE_BASE64 }}
         run: |
-          echo "$SPIDER_KEYSTORE_BASE64" | base64 --decode > spider-release.jks
+          if [ -n "$SPIDER_KEYSTORE_BASE64" ]; then
+            echo "$SPIDER_KEYSTORE_BASE64" | base64 --decode > spider-release.jks
+          else
+            echo "Stable signing key is not configured; building with the default debug key."
+          fi
 
       - name: Build APK
         env:
