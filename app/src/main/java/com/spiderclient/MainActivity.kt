@@ -169,8 +169,6 @@ class MainActivity : Activity() {
     }
 
     private fun attachMagneticEffect(view: View) {
-        if (view.getTag(R.id.magnetic_effect_attached) == true) return
-        view.setTag(R.id.magnetic_effect_attached, true)
         view.setOnHoverListener { v, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE -> {
