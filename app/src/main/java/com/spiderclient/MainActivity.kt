@@ -204,7 +204,7 @@ class MainActivity : Activity() {
         detail(info, t("Selected server", "سرور انتخاب‌شده"), active?.let { maskedAddress(it.raw) } ?: "—")
         detail(info, t("Last ping", "آخرین پینگ"), active?.ping ?: "—")
         space(content, 8)
-        content.addView(text(t("Powered by Xray-core. Connection is shown only when the core reports a running state.", "مبتنی بر Xray-core؛ اتصال فقط پس از اجرای واقعی هسته نمایش داده می‌شود."), 11f, gray))
+        content.addView(text(t("UI test build: Xray core is temporarily excluded, so real VPN connections are unavailable.", "نسخه آزمایشی رابط کاربری: هسته Xray موقتاً حذف شده، بنابراین اتصال واقعی VPN در دسترس نیست."), 11f, gray))
     }
 
     private fun showConfigs() {
