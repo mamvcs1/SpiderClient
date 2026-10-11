@@ -9,7 +9,8 @@
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true">
-
+        android:icon="@drawable/spider_icon"
+        
         <activity
             android:name=".MainActivity"
             android:exported="true">
