@@ -45,6 +45,13 @@ jobs:
           fi
           cp "$AAR" app/libs/libxray.aar
           test -s app/libs/libxray.aar
+          echo "Selected Android artifact: $AAR"
+          echo "AAR entries:"
+          unzip -l app/libs/libxray.aar | head -60
+          mkdir -p /tmp/libxray-aar-inspect
+          unzip -p app/libs/libxray.aar classes.jar > /tmp/libxray-aar-inspect/classes.jar
+          echo "Generated Java/Kotlin API classes:"
+          jar tf /tmp/libxray-aar-inspect/classes.jar | grep -Ei 'libxray|dialer|controller' | head -100 || true
           echo "Pinned libXray Android AAR installed for Gradle."
 
       - name: Set up Gradle
