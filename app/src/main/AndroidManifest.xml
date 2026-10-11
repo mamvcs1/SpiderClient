@@ -6,9 +6,9 @@
     <application
         android:allowBackup="false"
         android:label="Spider Client"
-        android:icon="@drawable/spider_icon"
         android:theme="@android:style/Theme.Material.NoActionBar"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="false"
+        android:supportsRtl="true">
 
         <activity
             android:name=".MainActivity"
