@@ -5,12 +5,12 @@
 
     <application
         android:allowBackup="false"
+        android:icon="@drawable/spider_icon"
         android:label="Spider Client"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true">
-        android:icon="@drawable/spider_icon"
-        
+
         <activity
             android:name=".MainActivity"
             android:exported="true">
