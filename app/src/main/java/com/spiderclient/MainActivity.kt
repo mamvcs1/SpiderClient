@@ -789,6 +789,8 @@ class MainActivity : Activity() {
 
     private var activePanelDismiss: (() -> Unit)? = null
     private var selectorDismiss: (() -> Unit)? = null
+    private var lastTouchScreenX = -1
+    private var lastTouchScreenY = -1
 
     /** Custom black/red in-app modal surface for app-owned menus and forms. */
     private fun showInAppPanel(title: String, body: View?, actions: List<Pair<String, () -> Unit>>): () -> Unit {
@@ -861,8 +863,9 @@ class MainActivity : Activity() {
         popup.setOnClickListener { }
         val pos=IntArray(2); val decorPos=IntArray(2); anchor.getLocationOnScreen(pos); decor.getLocationOnScreen(decorPos)
         val screenW=resources.displayMetrics.widthPixels; val width=minOf(screenW-dp(24),dp(320))
-        val ax=if(anchor.width>0) pos[0]+anchor.width/2 else screenW/2
-        val ay=if(anchor.height>0) pos[1]+anchor.height else decorPos[1]+dp(70)
+        val useFinger = anchor.id == android.R.id.content && lastTouchScreenX >= 0 && lastTouchScreenY >= 0
+        val ax=if(useFinger) lastTouchScreenX else if(anchor.width>0) pos[0]+anchor.width/2 else screenW/2
+        val ay=if(useFinger) lastTouchScreenY else if(anchor.height>0) pos[1]+anchor.height else decorPos[1]+dp(70)
         val maxY=(resources.displayMetrics.heightPixels-dp(maxHeightDp+90)).coerceAtLeast(dp(24))
         val lp=FrameLayout.LayoutParams(width,ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.TOP or Gravity.START).apply {
             leftMargin=(ax-width/2).coerceIn(dp(8),screenW-width-dp(8))
@@ -915,7 +918,7 @@ class MainActivity : Activity() {
             setPadding(dp(10), dp(12), dp(10), dp(12)); isClickable = true; isFocusable = true
             setOnTouchListener { v, e ->
                 when (e.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> { v.pivotX=e.x.coerceIn(0f,v.width.toFloat()); v.pivotY=e.y.coerceIn(0f,v.height.toFloat()); v.animate().cancel(); v.animate().scaleX(.975f).scaleY(.975f).rotationX(((e.y/v.height.coerceAtLeast(1))-.5f)*-5f).rotationY(((e.x/v.width.coerceAtLeast(1))-.5f)*5f).setDuration(100).start() }
+                    MotionEvent.ACTION_DOWN -> { v.pivotX=e.x.coerceIn(0f,v.width.toFloat()); v.pivotY=e.y.coerceIn(0f,v.height.toFloat()); val touchPos=IntArray(2); v.getLocationOnScreen(touchPos); lastTouchScreenX=touchPos[0]+e.x.toInt(); lastTouchScreenY=touchPos[1]+e.y.toInt(); v.animate().cancel(); v.animate().scaleX(.975f).scaleY(.975f).rotationX(((e.y/v.height.coerceAtLeast(1))-.5f)*-5f).rotationY(((e.x/v.width.coerceAtLeast(1))-.5f)*5f).setDuration(100).start() }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).rotationX(0f).rotationY(0f).setDuration(260).setInterpolator(OvershootInterpolator(1.5f)).start()
                 }; false
             }
@@ -946,7 +949,7 @@ class MainActivity : Activity() {
     private fun glassDrawable(radius: Int, emphasized: Boolean = false): GradientDrawable = GradientDrawable(
         GradientDrawable.Orientation.TOP_BOTTOM,
         intArrayOf(
-            Color.argb(if (emphasized) 185 else 105, 255, 255, 255),
+            Color.argb(if (emphasized) 48 else 22, 255, 38, 56),
             Color.argb(if (emphasized) 170 else 72, 78, 38, 49),
             Color.argb(155, 18, 13, 19)
         )
