@@ -5,7 +5,7 @@ import android.content.Intent
 import android.os.IBinder
 
 /**
- * Lightweight UI-test build: Xray core is intentionally excluded.
+ * Spider Client UI test service. Xray core will be integrated in a later build.
  * Connection requests report that core support has not been added yet.
  */
 class SpiderVpnService : Service() {
@@ -19,7 +19,7 @@ class SpiderVpnService : Service() {
         val prefs = getSharedPreferences("spider_client", MODE_PRIVATE)
         prefs.edit()
             .putBoolean("vpn_connected", false)
-            .putString("vpn_error", "This lightweight test build does not include Xray core.")
+            .putString("vpn_error", "Xray core is temporarily not included in this test build.")
             .apply()
         stopSelf(startId)
         return START_NOT_STICKY
