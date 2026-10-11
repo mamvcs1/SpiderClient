@@ -251,23 +251,20 @@ class MainActivity : Activity() {
     }
 
     private fun showImportMenu() {
-        val items = arrayOf(
-            t("Manual / paste configuration", "ورود دستی / چسباندن پیکربندی"),
-            t("Import from clipboard", "واردکردن از کلیپ‌بورد"),
-            t("Import from file", "واردکردن فایل"),
-            t("Subscription URL", "نشانی اشتراک"),
-            t("Scan QR code", "اسکن کد QR"),
-            t("Bulk import text", "واردکردن گروهی متن")
+        val options = listOf(
+            t("Manual / paste configuration", "ورود دستی / چسباندن پیکربندی") to { showManualDialog(false) },
+            t("Import from clipboard", "واردکردن از کلیپ‌بورد") to { importClipboard() },
+            t("Import from file", "واردکردن فایل") to { openConfigFile() },
+            t("Subscription URL", "نشانی اشتراک") to { showSubscriptionDialog() },
+            t("Scan QR code", "اسکن کد QR") to { explain(t("A QR scanner library is not configured yet.", "کتابخانه اسکن QR هنوز به پروژه اضافه نشده است.")) },
+            t("Bulk import text", "واردکردن گروهی متن") to { showManualDialog(true) }
         )
-        AlertDialog.Builder(this).setTitle(t("Add configuration", "افزودن پیکربندی")).setItems(items) { _, which ->
-            when (which) {
-                0, 5 -> showManualDialog(which == 5)
-                1 -> importClipboard()
-                2 -> openConfigFile()
-                3 -> showSubscriptionDialog()
-                4 -> explain(t("A QR scanner library is not configured yet.", "کتابخانه اسکن QR هنوز به پروژه اضافه نشده است."))
-            }
-        }.show()
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(4), 0, dp(4)) }
+        options.forEach { (label, action) ->
+            list.addView(smallButton(label + "   ›") { activePanelDismiss?.invoke(); action() },
+                LinearLayout.LayoutParams(-1, dp(48)).apply { setMargins(0, dp(3), 0, dp(3)) })
+        }
+        showInAppPanel(t("Add configuration", "افزودن پیکربندی"), list, listOf(t("Cancel", "لغو") to {}))
     }
 
     private fun showManualDialog(bulk: Boolean) {
@@ -276,10 +273,17 @@ class MainActivity : Activity() {
             setTextColor(white); setHintTextColor(gray); minLines = if (bulk) 5 else 3
             background = panelDrawable(Color.rgb(38, 30, 34), 12, red, 1); setPadding(dp(10), dp(10), dp(10), dp(10))
         }
-        val box = LinearLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input, LinearLayout.LayoutParams(-1, -2)) }
-        AlertDialog.Builder(this).setTitle(t("Add configuration", "افزودن پیکربندی")).setView(box)
-            .setNegativeButton(t("Cancel", "لغو"), null)
-            .setPositiveButton(t("Import", "واردکردن")) { _, _ -> addConfigText(input.text.toString(), bulk) }.show()
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(2), dp(8), dp(2), dp(8))
+            addView(text(if (bulk) t("Paste one configuration per line", "هر پیکربندی را در یک خط وارد کنید") else t("Paste a share link or JSON", "پیوند اشتراک یا JSON را وارد کنید"), 12f, gray))
+            space(this, 8)
+            addView(input, LinearLayout.LayoutParams(-1, if (bulk) dp(150) else dp(110)))
+        }
+        showInAppPanel(t(if (bulk) "Bulk import" else "Add configuration", if (bulk) "واردکردن گروهی" else "افزودن پیکربندی"), box, listOf(
+            t("Cancel", "لغو") to {},
+            t("Import", "واردکردن") to { addConfigText(input.text.toString(), bulk) }
+        ))
     }
 
     private fun importClipboard() {
@@ -764,7 +768,12 @@ class MainActivity : Activity() {
     }
 
     private fun explain(message: String) {
-        AlertDialog.Builder(this).setMessage(message).setPositiveButton(t("OK", "باشه"), null).show()
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(2), dp(8), dp(2), dp(8))
+            addView(text(message, 13f, white))
+        }
+        showInAppPanel(t("Spider Client", "اسپایدر کلاینت"), body, listOf(t("OK", "باشه") to {}))
     }
 
     private fun detail(parent: LinearLayout, label: String, value: String) {
