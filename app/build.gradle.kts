@@ -11,8 +11,8 @@ android {
         applicationId = "com.spiderclient"
         minSdk = 23
         targetSdk = 28
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = maxOf(2, System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 2)
+        versionName = "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "1"}"
     }
 
     compileOptions {
