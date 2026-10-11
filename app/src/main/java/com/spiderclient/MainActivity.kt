@@ -930,7 +930,7 @@ class MainActivity : Activity() {
 
 
     private fun showPopover(title: String, body: View, anchor: View, maxHeightDp: Int = 320): () -> Unit {
-        activePanelDismiss?.invoke()
+        // Keep the previous menu/panel underneath so nested option menus stack instead of replacing it.
         val decor=window.decorView as ViewGroup
         val overlay=FrameLayout(this).apply { setBackgroundColor(Color.TRANSPARENT); isClickable=true }
         val popup=LinearLayout(this).apply {
