@@ -349,13 +349,15 @@ private fun refreshScreen() {
             }
         }
 
-        connectionCard.addView(
-            connectButton,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                -2
-            )
-        )
+(connectButton.parent as? ViewGroup)?.removeView(connectButton)
+
+connectionCard.addView(
+    connectButton,
+    LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        -2
+    )
+)
 
         addSpace(content, 20)
 
