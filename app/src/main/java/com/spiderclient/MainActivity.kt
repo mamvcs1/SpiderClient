@@ -7,6 +7,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -40,6 +42,7 @@ class MainActivity : Activity() {
     private var fa = false
     private var selectedId = ""
     private var pinging = false
+    private var transitionBusy = false
     private data class Config(val id: String, var name: String, var raw: String, var ping: String = "—")
     private val configs = mutableListOf<Config>()
 
@@ -129,7 +132,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(4), dp(7), dp(4), dp(2))
-            background = panelDrawable(Color.argb(150, 28, 20, 25), 20, red, 1)
+            background = glassDrawable(20)
         }
         navItem(nav, "home", t("Home", "خانه"), R.drawable.ic_home)
         navItem(nav, "configs", t("Configs", "پیکربندی‌ها"), R.drawable.ic_configs)
@@ -145,7 +148,7 @@ class MainActivity : Activity() {
             isClickable = true
             isFocusable = true
             background = panelDrawable(if (selected) Color.argb(30, 255, 38, 56) else Color.TRANSPARENT, 14, if (selected) red else Color.TRANSPARENT, if (selected) 1 else 0)
-            setOnClickListener { currentTab = key; render() }
+            setOnClickListener { switchTabAnimated(key) }
         }
         val icon = ImageView(this).apply {
             setImageResource(iconRes)
@@ -216,7 +219,7 @@ class MainActivity : Activity() {
             actions.addView(smallButton(if (cfg.id == selectedId) t("Selected", "انتخاب‌شده") else t("Select", "انتخاب")) {
                 selectedId = cfg.id; saveConfigs(); render()
             }, LinearLayout.LayoutParams(0, dp(38), 1f))
-            actions.addView(smallButton(t("Ping", "پینگ")) { pingOne(cfg) }, LinearLayout.LayoutParams(0, dp(38), 1f).apply { setMargins(dp(5), 0, 0, 0) })
+            actions.addView(smallButton(t("Ping", "پینگ")) { pingOne(cfg, card) }, LinearLayout.LayoutParams(0, dp(38), 1f).apply { setMargins(dp(5), 0, 0, 0) })
             actions.addView(smallButton("⋮") { showConfigActions(cfg) }, LinearLayout.LayoutParams(dp(42), dp(38)).apply { setMargins(dp(5), 0, 0, 0) })
             card.addView(actions)
         }
@@ -470,11 +473,88 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun pingOne(cfg: Config) {
-        cfg.ping = t("Checking…", "در حال بررسی…"); render()
+    private fun pingOne(cfg: Config, rippleTarget: LinearLayout? = null) {
+        cfg.ping = t("Checking…", "در حال بررسی…")
+        rippleTarget?.let { addWaterRipple(it, true) }
+        render()
         io.execute {
             val result = tcpPing(cfg.raw)
-            runOnUiThread { configs.firstOrNull { it.id == cfg.id }?.ping = result; saveConfigs(); render() }
+            runOnUiThread {
+                configs.firstOrNull { it.id == cfg.id }?.ping = result
+                saveConfigs()
+                if (rippleTarget != null) addWaterRipple(rippleTarget, false, result.contains("ms"))
+                render()
+            }
+        }
+    }
+
+    private fun switchTabAnimated(key: String) {
+        if (transitionBusy || key == currentTab) return
+        transitionBusy = true
+        val old = content
+        old.animate().alpha(0f).translationY(dp(12).toFloat()).setDuration(130).withEndAction {
+            currentTab = key
+            render()
+            content.alpha = 0f
+            content.translationY = dp(-8).toFloat()
+            content.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(android.view.animation.DecelerateInterpolator()).withEndAction {
+                transitionBusy = false
+            }.start()
+        }.start()
+    }
+
+    private fun addWaterRipple(target: LinearLayout, running: Boolean, success: Boolean = false) {
+        val ripple = WaterRippleView(this, if (running) Color.YELLOW else if (success) red else Color.YELLOW, running)
+        target.addView(ripple, LinearLayout.LayoutParams(-1, dp(54)))
+        ripple.start {
+            target.removeView(ripple)
+        }
+    }
+
+    private inner class WaterRippleView(
+        context: Context,
+        private val rippleColor: Int,
+        private val continuous: Boolean
+    ) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private var progress = 0f
+        private var animator: android.animation.ValueAnimator? = null
+
+        init { setLayerType(View.LAYER_TYPE_HARDWARE, null) }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val cx = width / 2f
+            val cy = height / 2f
+            val maxRadius = minOf(width, height) * 0.42f
+            for (ring in 0..2) {
+                val phase = (progress + ring / 3f) % 1f
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = dp(1).toFloat()
+                paint.color = rippleColor
+                paint.alpha = ((1f - phase) * 150).toInt()
+                canvas.drawCircle(cx, cy, maxRadius * phase, paint)
+            }
+            paint.style = Paint.Style.FILL
+            paint.color = Color.argb(22, 255, 38, 56)
+            canvas.drawOval(cx - maxRadius * 1.5f, cy + maxRadius * 0.2f, cx + maxRadius * 1.5f, cy + maxRadius * 0.6f, paint)
+        }
+
+        fun start(onFinished: () -> Unit) {
+            animator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = if (continuous) 900L else 650L
+                repeatCount = if (continuous) android.animation.ValueAnimator.INFINITE else 0
+                addUpdateListener { progress = it.animatedValue as Float; invalidate() }
+                if (!continuous) addListener(object : android.animation.AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: android.animation.Animator) { onFinished() }
+                })
+                start()
+            }
+        }
+
+        override fun onDetachedFromWindow() {
+            animator?.cancel()
+            super.onDetachedFromWindow()
         }
     }
 
@@ -583,19 +663,31 @@ class MainActivity : Activity() {
     private fun button(label: String, action: () -> Unit): TextView =
         TextView(this).apply {
             text = label; textSize = 13f; setTextColor(white); gravity = Gravity.CENTER
-            background = panelDrawable(Color.argb(215, 150, 20, 38), 14, red, 1)
+            background = glassDrawable(14, true)
             setPadding(dp(10), dp(12), dp(10), dp(12)); isClickable = true; isFocusable = true
             setOnClickListener { animate().scaleX(0.97f).scaleY(0.97f).setDuration(70).withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(90).start(); action() }.start() }
         }
 
     private fun smallButton(label: String, action: () -> Unit): TextView =
-        TextView(this).apply { text = label; textSize = 11f; setTextColor(white); gravity = Gravity.CENTER; background = panelDrawable(Color.argb(150, 45, 31, 37), 10, Color.argb(120, 255, 38, 56), 1); isClickable = true; setOnClickListener { action() } }
+        TextView(this).apply { text = label; textSize = 11f; setTextColor(white); gravity = Gravity.CENTER; background = glassDrawable(10); isClickable = true; setOnClickListener { action() } }
 
     private fun panel(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(14), dp(13), dp(14), dp(13))
-        background = panelDrawable(Color.argb(178, 31, 24, 29), 18, Color.argb(110, 255, 55, 75), 1)
+        background = glassDrawable(18)
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(6), 0, dp(6)) }
+    }
+
+    private fun glassDrawable(radius: Int, emphasized: Boolean = false): GradientDrawable = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(
+            Color.argb(if (emphasized) 185 else 105, 255, 255, 255),
+            Color.argb(if (emphasized) 170 else 72, 78, 38, 49),
+            Color.argb(155, 18, 13, 19)
+        )
+    ).apply {
+        cornerRadius = dp(radius).toFloat()
+        setStroke(dp(1), Color.argb(if (emphasized) 210 else 100, 255, 65, 83))
     }
 
     private fun panelDrawable(color: Int, radius: Int, stroke: Int, width: Int) = GradientDrawable().apply {
