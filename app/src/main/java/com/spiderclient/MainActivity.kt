@@ -121,7 +121,11 @@ class MainActivity : Activity() {
         titleBox.addView(text("SPIDER CLIENT", 17f, white, true))
         titleBox.addView(text(t("PRIVATE CONNECTION", "اتصال خصوصی"), 10f, gray))
         header.addView(titleBox, LinearLayout.LayoutParams(0, -2, 1f))
-        val status = text(t("NOT CONNECTED", "متصل نیست"), 10f, red, true)
+        val connectedNow = prefs.getBoolean("vpn_connected", false)
+        val status = text(
+            if (connectedNow) t("CONNECTED", "متصل") else t("NOT CONNECTED", "متصل نیست"),
+            10f, if (connectedNow) green else red, true
+        )
         header.addView(status)
         root.addView(header)
 
@@ -408,11 +412,11 @@ class MainActivity : Activity() {
     private fun startVpnService() {
         val raw = pendingVpnRaw
         if (raw.isBlank()) return
+        prefs.edit().putString("vpn_error", "").putBoolean("vpn_connected", false).apply()
         val intent = Intent(this, SpiderVpnService::class.java)
             .setAction(SpiderVpnService.ACTION_START)
             .putExtra(SpiderVpnService.EXTRA_RAW_CONFIG, raw)
         if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
-        prefs.edit().putString("vpn_error", "").apply()
         Handler(Looper.getMainLooper()).postDelayed({ refreshVpnStatus(0) }, 1000)
     }
 
