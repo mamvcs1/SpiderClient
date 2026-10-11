@@ -2,7 +2,6 @@ package com.spiderclient
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.os.Bundle
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -11,1154 +10,488 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import org.json.JSONObject
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.URI
+import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
-
     private val red = Color.rgb(255, 38, 56)
-    private val backgroundColor = Color.rgb(13, 13, 15)
-    private val cardColor = Color.rgb(26, 26, 31)
     private val white = Color.WHITE
-    private val gray = Color.rgb(165, 165, 175)
+    private val gray = Color.rgb(175, 175, 185)
     private val green = Color.rgb(53, 212, 154)
-
+    private val prefs by lazy { getSharedPreferences("spider_client", MODE_PRIVATE) }
+    private val io = Executors.newSingleThreadExecutor()
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
-    private lateinit var statusText: TextView
-    private lateinit var connectButton: TextView
-    private lateinit var configSummary: TextView
+    private var currentTab = "home"
+    private var fa = false
+    private var selectedId = ""
+    private var pinging = false
+    private data class Config(val id: String, var name: String, var raw: String, var ping: String = "—")
+    private val configs = mutableListOf<Config>()
 
-    private var currentTab = "Home"
-    private var connected = false
-    private var activeConfig = "No configuration selected"
-
-    private val configs = mutableListOf<String>()
-
-override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-
-    window.statusBarColor = Color.rgb(8, 8, 8)
-    window.navigationBarColor = Color.rgb(8, 8, 8)
-
-    try {
-        createLayout()
-        showHome()
-    } catch (e: Exception) {
-        AlertDialog.Builder(this)
-            .setTitle("Spider Client Error")
-            .setMessage(
-                "${e.javaClass.simpleName}: ${e.message}\n\n" +
-                e.stackTraceToString()
-            )
-            .setPositiveButton("OK", null)
-            .show()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        fa = prefs.getBoolean("fa", false)
+        selectedId = prefs.getString("selected_id", "") ?: ""
+        loadConfigs()
+        window.statusBarColor = Color.rgb(12, 8, 10)
+        window.navigationBarColor = Color.rgb(12, 8, 10)
+        render()
     }
-}
 
-    private fun createLayout() {
+    override fun onDestroy() {
+        io.shutdownNow()
+        super.onDestroy()
+    }
+
+    private fun t(en: String, faText: String): String = if (fa) faText else en
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
+
+    private fun loadConfigs() {
+        configs.clear()
+        val raw = prefs.getString("configs_json", "[]") ?: "[]"
+        try {
+            val arr = org.json.JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                configs.add(Config(o.optString("id"), o.optString("name"), o.optString("raw"), o.optString("ping", "—")))
+            }
+        } catch (_: Exception) { }
+    }
+
+    private fun saveConfigs() {
+        val arr = org.json.JSONArray()
+        configs.forEach {
+            arr.put(JSONObject().put("id", it.id).put("name", it.name).put("raw", it.raw).put("ping", it.ping))
+        }
+        prefs.edit().putString("configs_json", arr.toString()).putString("selected_id", selectedId).apply()
+    }
+
+    private fun render() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(backgroundColor)
-            setPadding(dp(18), dp(12), dp(18), dp(8))
+            setPadding(dp(14), dp(8), dp(14), dp(5))
+            setBackgroundColor(Color.rgb(12, 9, 12))
         }
-
         setContentView(root)
-
-        createHeader()
-
-        content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            clipToPadding = false
-            addView(
-                content,
-                ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-        }
-
-        root.addView(
-            scroll,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
-        )
-
-        createBottomNavigation()
-    }
-
-    private fun createHeader() {
         val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(8), 0, dp(18))
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(4), dp(4), dp(4), dp(12))
         }
-
         val logo = ImageView(this).apply {
-            setImageResource(R.drawable.ic_spider)
-            scaleType = ImageView.ScaleType.FIT_CENTER
+            setImageResource(R.drawable.spider_icon)
+            scaleType = ImageView.ScaleType.CENTER_CROP
         }
-
-        header.addView(
-            logo,
-            LinearLayout.LayoutParams(dp(42), dp(42))
-        )
-
-        val titleContainer = LinearLayout(this).apply {
+        header.addView(logo, LinearLayout.LayoutParams(dp(42), dp(42)))
+        val titleBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), 0, 0, 0)
         }
-
-        val title = TextView(this).apply {
-            text = "SPIDER CLIENT"
-            textSize = 18f
-            setTextColor(white)
-            typeface = Typeface.DEFAULT_BOLD
-        }
-
-        val subtitle = TextView(this).apply {
-            text = "SECURE CONNECTION"
-            textSize = 10f
-            setTextColor(gray)
-        }
-
-        titleContainer.addView(title)
-        titleContainer.addView(subtitle)
-
-        header.addView(
-            titleContainer,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        val indicator = View(this).apply {
-            background = roundedDrawable(
-                if (connected) green else red,
-                50
-            )
-        }
-
-        header.addView(
-            indicator,
-            LinearLayout.LayoutParams(dp(8), dp(8))
-        )
-
-        statusText = TextView(this).apply {
-            text = if (connected) "Connected" else "Disconnected"
-            textSize = 11f
-            setTextColor(if (connected) green else gray)
-            setPadding(dp(7), 0, 0, 0)
-        }
-
-        header.addView(statusText)
+        titleBox.addView(text("SPIDER CLIENT", 17f, white, true))
+        titleBox.addView(text(t("PRIVATE CONNECTION", "اتصال خصوصی"), 10f, gray))
+        header.addView(titleBox, LinearLayout.LayoutParams(0, -2, 1f))
+        val status = text(t("NOT CONNECTED", "متصل نیست"), 10f, red, true)
+        header.addView(status)
         root.addView(header)
-    }
 
-    private fun createBottomNavigation() {
-        val navigation = LinearLayout(this).apply {
+        content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = if (fa) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        }
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            addView(content, ViewGroup.LayoutParams(-1, -2))
+        }
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        when (currentTab) {
+            "home" -> showHome()
+            "configs" -> showConfigs()
+            else -> showSettings()
+        }
+        val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, dp(10), 0, dp(4))
+            setPadding(dp(4), dp(7), dp(4), dp(2))
+            background = panelDrawable(Color.argb(150, 28, 20, 25), 20, red, 1)
         }
-
-        addNavigationItem(navigation, "Home", R.drawable.ic_home)
-        addNavigationItem(navigation, "Configs", R.drawable.ic_configs)
-        addNavigationItem(navigation, "Settings", R.drawable.ic_settings)
-
-        root.addView(
-            navigation,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(64)
-            )
-        )
+        navItem(nav, "home", t("Home", "خانه"), R.drawable.ic_home)
+        navItem(nav, "configs", t("Configs", "پیکربندی‌ها"), R.drawable.ic_configs)
+        navItem(nav, "settings", t("Settings", "تنظیمات"), R.drawable.ic_settings)
+        root.addView(nav, LinearLayout.LayoutParams(-1, dp(62)))
     }
 
-    private fun addNavigationItem(
-        parent: LinearLayout,
-        label: String,
-        iconRes: Int
-    ) {
+    private fun navItem(parent: LinearLayout, key: String, label: String, iconRes: Int) {
+        val selected = currentTab == key
         val item = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = true
-            setPadding(dp(8), dp(5), dp(8), dp(5))
-            background = roundedDrawable(
-                if (currentTab == label) red else cardColor,
-                14
-            )
-            setOnClickListener {
-                currentTab = label
-                refreshScreen()
-            }
+            background = panelDrawable(if (selected) Color.argb(30, 255, 38, 56) else Color.TRANSPARENT, 14, if (selected) red else Color.TRANSPARENT, if (selected) 1 else 0)
+            setOnClickListener { currentTab = key; render() }
         }
-
         val icon = ImageView(this).apply {
             setImageResource(iconRes)
+            setColorFilter(if (selected) red else gray)
         }
-
-        item.addView(
-            icon,
-            LinearLayout.LayoutParams(dp(24), dp(24))
-        )
-
-        val text = TextView(this).apply {
-            this.text = label
-            textSize = 11f
-            setTextColor(white)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(3), 0, 0)
-        }
-
-        item.addView(text)
-
-        parent.addView(
-            item,
-            LinearLayout.LayoutParams(0, -1, 1f).apply {
-                setMargins(dp(4), 0, dp(4), 0)
-            }
-        )
+        item.addView(icon, LinearLayout.LayoutParams(dp(23), dp(23)))
+        item.addView(text(label, 10f, if (selected) red else gray, selected))
+        parent.addView(item, LinearLayout.LayoutParams(0, -1, 1f).apply { setMargins(dp(3), 0, dp(3), 0) })
     }
 
-private fun refreshScreen() {
-    root.removeAllViews()
+    private fun showHome() {
+        content.addView(text(t("Your connection", "اتصال شما"), 23f, white, true))
+        content.addView(text(t("Manage your server and connection status.", "سرور و وضعیت اتصال خود را مدیریت کنید."), 12f, gray))
+        space(content, 12)
+        val card = panel()
+        content.addView(card)
+        val shield = ImageView(this).apply { setImageResource(R.drawable.ic_shield); setColorFilter(red) }
+        card.addView(shield, LinearLayout.LayoutParams(dp(38), dp(38)))
+        space(card, 7)
+        card.addView(text(t("DISCONNECTED", "قطع اتصال"), 19f, white, true))
+        space(card, 4)
+        val active = configs.firstOrNull { it.id == selectedId }
+        card.addView(text(active?.name ?: t("No configuration selected", "پیکربندی انتخاب نشده"), 12f, gray))
+        space(card, 12)
+        card.addView(button(t("CONNECT", "اتصال")) {
+            toast(t("Real VPN is not enabled yet. The Xray/VpnService connection must be completed first.", "اتصال واقعی VPN هنوز فعال نیست؛ ابتدا باید Xray و VpnService تکمیل شوند."))
+        })
+        space(content, 12)
+        val info = panel()
+        content.addView(info)
+        info.addView(text(t("QUICK STATUS", "وضعیت سریع"), 11f, red, true))
+        space(info, 8)
+        detail(info, t("Saved configurations", "پیکربندی‌های ذخیره‌شده"), configs.size.toString())
+        detail(info, t("Selected server", "سرور انتخاب‌شده"), active?.let { maskedAddress(it.raw) } ?: "—")
+        detail(info, t("Last ping", "آخرین پینگ"), active?.ping ?: "—")
+        space(content, 8)
+        content.addView(text(t("Connection is currently a UI prototype; no active tunnel is claimed.", "اتصال در حال حاضر نمونه رابط کاربری است؛ تونل فعال ادعا نمی‌شود."), 11f, gray))
+    }
 
-    createHeader()
+    private fun showConfigs() {
+        val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; orientation = LinearLayout.HORIZONTAL }
+        top.addView(text(t("Configurations", "پیکربندی‌ها"), 22f, white, true), LinearLayout.LayoutParams(0, -2, 1f))
+        top.addView(button("+") { showImportMenu() }, LinearLayout.LayoutParams(dp(52), dp(46)))
+        content.addView(top)
+        content.addView(text(t("Server links are stored locally on this device.", "پیوندهای سرور به‌صورت محلی روی دستگاه ذخیره می‌شوند."), 12f, gray))
+        space(content, 8)
+        content.addView(button(t("↻  Ping all", "↻  پینگ همه")) { pingAll() })
+        space(content, 10)
+        if (configs.isEmpty()) {
+            val empty = panel()
+            content.addView(empty)
+            empty.addView(text(t("No configurations yet", "هنوز پیکربندی‌ای ندارید"), 15f, white, true))
+            space(empty, 5)
+            empty.addView(text(t("Tap + to add a link, import text, or select a file.", "برای افزودن پیوند، واردکردن متن یا انتخاب فایل، + را بزنید."), 12f, gray))
+        }
+        configs.forEach { cfg ->
+            val card = panel().apply { setPadding(dp(12), dp(12), dp(12), dp(12)) }
+            content.addView(card)
+            val title = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val titleBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            titleBox.addView(text(cfg.name, 14f, white, true))
+            titleBox.addView(text(maskedAddress(cfg.raw), 11f, gray))
+            title.addView(titleBox, LinearLayout.LayoutParams(0, -2, 1f))
+            title.addView(text(cfg.ping, 11f, pingColor(cfg.ping), true))
+            card.addView(title)
+            space(card, 9)
+            val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            actions.addView(smallButton(if (cfg.id == selectedId) t("Selected", "انتخاب‌شده") else t("Select", "انتخاب")) {
+                selectedId = cfg.id; saveConfigs(); render()
+            }, LinearLayout.LayoutParams(0, dp(38), 1f))
+            actions.addView(smallButton(t("Ping", "پینگ")) { pingOne(cfg) }, LinearLayout.LayoutParams(0, dp(38), 1f).apply { setMargins(dp(5), 0, 0, 0) })
+            actions.addView(smallButton("⋮") { showConfigActions(cfg) }, LinearLayout.LayoutParams(dp(42), dp(38)).apply { setMargins(dp(5), 0, 0, 0) })
+            card.addView(actions)
+        }
+    }
 
-    content = LinearLayout(this).apply {
+    private fun showImportMenu() {
+        val items = arrayOf(
+            t("Manual / paste configuration", "ورود دستی / چسباندن پیکربندی"),
+            t("Import from clipboard", "واردکردن از کلیپ‌بورد"),
+            t("Import from file", "واردکردن فایل"),
+            t("Subscription URL", "نشانی اشتراک"),
+            t("Scan QR code", "اسکن کد QR"),
+            t("Bulk import text", "واردکردن گروهی متن")
+        )
+        AlertDialog.Builder(this).setTitle(t("Add configuration", "افزودن پیکربندی")).setItems(items) { _, which ->
+            when (which) {
+                0, 5 -> showManualDialog(which == 5)
+                1 -> importClipboard()
+                2 -> openConfigFile()
+                3 -> showSubscriptionDialog()
+                4 -> explain(t("A QR scanner library is not configured yet.", "کتابخانه اسکن QR هنوز به پروژه اضافه نشده است."))
+            }
+        }.show()
+    }
+
+    private fun showManualDialog(bulk: Boolean) {
+        val input = EditText(this).apply {
+            hint = if (bulk) t("Paste one configuration per line", "هر پیکربندی را در یک خط وارد کنید") else t("Paste a share link or JSON", "پیوند اشتراک یا JSON را وارد کنید")
+            setTextColor(white); setHintTextColor(gray); minLines = if (bulk) 5 else 3
+            background = panelDrawable(Color.rgb(38, 30, 34), 12, red, 1); setPadding(dp(10), dp(10), dp(10), dp(10))
+        }
+        val box = LinearLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input, LinearLayout.LayoutParams(-1, -2)) }
+        AlertDialog.Builder(this).setTitle(t("Add configuration", "افزودن پیکربندی")).setView(box)
+            .setNegativeButton(t("Cancel", "لغو"), null)
+            .setPositiveButton(t("Import", "واردکردن")) { _, _ -> addConfigText(input.text.toString(), bulk) }.show()
+    }
+
+    private fun importClipboard() {
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val value = try { cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString().orEmpty() } catch (_: Exception) { "" }
+        if (value.isBlank()) toast(t("Clipboard is empty", "کلیپ‌بورد خالی است")) else addConfigText(value, true)
+    }
+
+    private fun openConfigFile() {
+        try {
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }, 41)
+        } catch (_: Exception) { explain(t("No file picker is available.", "انتخاب‌گر فایل در دسترس نیست.")) }
+    }
+
+    @Deprecated("Deprecated by Android but works on supported versions")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 41 && resultCode == RESULT_OK) {
+            val uri: Uri = data?.data ?: return
+            try { contentResolver.openInputStream(uri)?.bufferedReader()?.use { addConfigText(it.readText(), true) } }
+            catch (e: Exception) { toast(t("Could not read that file", "خواندن فایل ممکن نشد")) }
+        }
+    }
+
+    private fun showSubscriptionDialog() {
+        val input = EditText(this).apply { hint = "https://"; setTextColor(white); setHintTextColor(gray) }
+        AlertDialog.Builder(this).setTitle(t("Subscription URL", "نشانی اشتراک")).setView(input)
+            .setNegativeButton(t("Cancel", "لغو"), null).setPositiveButton(t("Fetch", "دریافت")) { _, _ ->
+                val url = input.text.toString().trim()
+                if (!url.startsWith("https://")) { toast(t("Use a valid HTTPS URL", "نشانی HTTPS معتبر وارد کنید")); return@setPositiveButton }
+                io.execute {
+                    try {
+                        val conn = java.net.URL(url).openConnection()
+                        conn.connectTimeout = 8000; conn.readTimeout = 8000
+                        val result = conn.getInputStream().bufferedReader().use { it.readText() }
+                        runOnUiThread { addConfigText(result, true) }
+                    } catch (_: Exception) { runOnUiThread { toast(t("Subscription could not be downloaded", "دریافت اشتراک ناموفق بود")) } }
+                }
+            }.show()
+    }
+
+    private fun addConfigText(value: String, multiple: Boolean) {
+        val lines = if (multiple) value.lines().map { it.trim() }.filter { it.isNotBlank() && !it.startsWith("#") } else listOf(value.trim()).filter { it.isNotBlank() }
+        var added = 0
+        lines.forEach { raw ->
+            if (raw.length < 8) return@forEach
+            val id = java.util.UUID.randomUUID().toString()
+            val protocol = protocolOf(raw)
+            val name = protocol + " " + (configs.size + 1)
+            configs.add(Config(id, name, raw))
+            if (selectedId.isBlank()) selectedId = id
+            added++
+        }
+        saveConfigs()
+        if (added == 0) toast(t("No usable configuration text found", "پیکربندی معتبری پیدا نشد")) else {
+            toast(t("Imported ", "وارد شد: ") + added)
+            currentTab = "configs"; render()
+        }
+    }
+
+    private fun showConfigActions(cfg: Config) {
+        val items = arrayOf(t("Edit name / link", "ویرایش نام / پیوند"), t("Copy link", "کپی پیوند"), t("Share", "اشتراک‌گذاری"), t("Refresh ping", "تازه‌سازی پینگ"), t("Delete", "حذف"))
+        AlertDialog.Builder(this).setTitle(cfg.name).setItems(items) { _, which ->
+            when (which) {
+                0 -> editConfig(cfg)
+                1 -> { val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager; cm.setPrimaryClip(ClipData.newPlainText(cfg.name, cfg.raw)); toast(t("Copied", "کپی شد")) }
+                2 -> startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, cfg.raw), t("Share configuration", "اشتراک‌گذاری پیکربندی")))
+                3 -> pingOne(cfg)
+                4 -> AlertDialog.Builder(this).setMessage(t("Delete this configuration?", "این پیکربندی حذف شود؟")).setNegativeButton(t("Cancel", "لغو"), null).setPositiveButton(t("Delete", "حذف")) { _, _ ->
+                    configs.remove(cfg); if (selectedId == cfg.id) selectedId = configs.firstOrNull()?.id ?: ""; saveConfigs(); render()
+                }.show()
+            }
+        }.show()
+    }
+
+    private fun editConfig(cfg: Config) {
+        val name = EditText(this).apply { setText(cfg.name); hint = t("Name", "نام"); setTextColor(white) }
+        val raw = EditText(this).apply { setText(cfg.raw); hint = t("Configuration URI / JSON", "پیوند یا JSON پیکربندی"); minLines = 3; setTextColor(white) }
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0); addView(name); addView(raw) }
+        AlertDialog.Builder(this).setTitle(t("Edit configuration", "ویرایش پیکربندی")).setView(box)
+            .setNegativeButton(t("Cancel", "لغو"), null).setPositiveButton(t("Save", "ذخیره")) { _, _ ->
+                val newRaw = raw.text.toString().trim()
+                if (newRaw.isNotBlank()) { cfg.name = name.text.toString().trim().ifBlank { protocolOf(newRaw) }; cfg.raw = newRaw; saveConfigs(); render() }
+            }.show()
+    }
+
+    private fun pingAll() {
+        if (pinging) return
+        if (configs.isEmpty()) { toast(t("Add a configuration first", "ابتدا پیکربندی اضافه کنید")); return }
+        pinging = true
+        toast(t("Checking server TCP reachability…", "در حال بررسی دسترسی TCP سرورها…"))
+        val snapshot = configs.toList()
+        io.execute {
+            snapshot.forEach { cfg ->
+                val result = tcpPing(cfg.raw)
+                runOnUiThread { configs.firstOrNull { it.id == cfg.id }?.ping = result; saveConfigs(); if (currentTab == "configs") render() }
+            }
+            runOnUiThread { pinging = false; toast(t("Ping checks complete (TCP reachability, not VPN latency)", "بررسی پینگ تمام شد (دسترسی TCP، نه تأخیر تونل VPN)")) }
+        }
+    }
+
+    private fun pingOne(cfg: Config) {
+        cfg.ping = t("Checking…", "در حال بررسی…"); render()
+        io.execute {
+            val result = tcpPing(cfg.raw)
+            runOnUiThread { configs.firstOrNull { it.id == cfg.id }?.ping = result; saveConfigs(); render() }
+        }
+    }
+
+    private fun tcpPing(raw: String): String {
+        val endpoint = endpoint(raw) ?: return t("N/A", "نامشخص")
+        val start = System.currentTimeMillis()
+        return try {
+            Socket().use { it.connect(InetSocketAddress(endpoint.first, endpoint.second), 2500) }
+            (System.currentTimeMillis() - start).toString() + " ms"
+        } catch (_: Exception) { t("Timeout", "مهلت تمام شد") }
+    }
+
+    private fun endpoint(raw: String): Pair<String, Int>? {
+        try {
+            if (raw.startsWith("{")) {
+                val j = JSONObject(raw)
+                val host = j.optString("add", j.optString("address", ""))
+                val port = j.optInt("port", 0)
+                if (host.isNotBlank() && port in 1..65535) return host to port
+            }
+            val u = URI(raw)
+            val host = u.host
+            val port = if (u.port > 0) u.port else when (u.scheme?.lowercase()) { "https", "trojan", "vless", "vmess" -> 443; "http" -> 80; else -> -1 }
+            if (!host.isNullOrBlank() && port in 1..65535) return host to port
+        } catch (_: Exception) { }
+        val m = Regex("@([^:/?#]+):(\\d+)").find(raw)
+        if (m != null) return m.groupValues[1] to (m.groupValues[2].toIntOrNull() ?: return null)
+        return null
+    }
+
+    private fun maskedAddress(raw: String): String {
+        val e = endpoint(raw) ?: return t("Address hidden", "نشانی پنهان")
+        val host = e.first
+        val mask = if (host.length <= 5) host.take(1) + "***" else host.take(2) + "***" + host.takeLast(minOf(5, host.length - 2))
+        return mask + ":" + e.second
+    }
+
+    private fun protocolOf(raw: String): String {
+        val s = raw.trim().lowercase()
+        return when {
+            s.startsWith("vless://") -> "VLESS"
+            s.startsWith("vmess://") -> "VMess"
+            s.startsWith("trojan://") -> "Trojan"
+            s.startsWith("ss://") || s.startsWith("shadowsocks://") -> "Shadowsocks"
+            s.startsWith("socks://") -> "SOCKS"
+            s.startsWith("http://") || s.startsWith("https://") -> "HTTP/HTTPS"
+            s.startsWith("{") -> try { JSONObject(raw).optString("protocol", "JSON config").uppercase() } catch (_: Exception) { "JSON config" }
+            else -> "Unknown"
+        }
+    }
+
+    private fun showSettings() {
+        content.addView(text(t("Settings", "تنظیمات"), 23f, white, true))
+        content.addView(text(t("Personalize Spider Client", "شخصی‌سازی اسپایدر کلاینت"), 12f, gray))
+        space(content, 12)
+        setting(t("Language", "زبان"), if (fa) "فارسی" else "English") {
+            AlertDialog.Builder(this).setTitle(t("Language", "زبان")).setItems(arrayOf("English", "فارسی")) { _, which ->
+                fa = which == 1; prefs.edit().putBoolean("fa", fa).apply(); render()
+            }.show()
+        }
+        setting(t("Appearance", "ظاهر"), t("Black / red theme", "تم مشکی / قرمز")) {
+            explain(t("The black and red theme is currently fixed. Glass blur effects depend on Android version and device support.", "تم مشکی و قرمز فعلاً ثابت است. افکت محوشدگی شیشه‌ای به نسخه اندروید و پشتیبانی دستگاه بستگی دارد."))
+        }
+        setting(t("Export configurations", "خروجی پیکربندی‌ها"), t("Share saved links", "اشتراک‌گذاری پیوندهای ذخیره‌شده")) {
+            if (configs.isEmpty()) toast(t("Nothing to export", "چیزی برای خروجی وجود ندارد")) else {
+                val all = configs.joinToString("\n") { it.raw }
+                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, all), t("Export configurations", "خروجی پیکربندی‌ها")))
+            }
+        }
+        setting(t("Clear ping history", "پاک‌کردن سابقه پینگ"), t("Reset saved ping values", "بازنشانی مقادیر پینگ ذخیره‌شده")) {
+            configs.forEach { it.ping = "—" }; saveConfigs(); render()
+        }
+        setting(t("Connection mode", "حالت اتصال"), t("Core not integrated", "هسته هنوز یکپارچه نشده")) {
+            explain(t("The project contains the UI and configuration management, but a working Xray core + Android VpnService connection is not yet wired up. The Connect button will not fake a connected status.", "پروژه رابط کاربری و مدیریت پیکربندی دارد، اما اتصال واقعی Xray و Android VpnService هنوز متصل نشده است. دکمه اتصال وضعیت جعلی نمایش نمی‌دهد."))
+        }
+        setting(t("About Spider Client", "درباره اسپایدر کلاینت"), "1.0.0") {
+            explain(t("Spider Client • version 1.0.0\nConfiguration links are stored locally. TCP ping tests server reachability only.", "اسپایدر کلاینت • نسخه ۱.۰.۰\nپیوندهای پیکربندی محلی ذخیره می‌شوند. پینگ TCP فقط دسترسی سرور را می‌سنجد."))
+        }
+    }
+
+    private fun setting(title: String, subtitle: String, action: () -> Unit) {
+        val c = panel().apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; isClickable = true; setOnClickListener { action() } }
+        content.addView(c)
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        box.addView(text(title, 14f, white, true))
+        box.addView(text(subtitle, 11f, gray))
+        c.addView(box, LinearLayout.LayoutParams(0, -2, 1f))
+        c.addView(text("›", 22f, red))
+        space(content, 7)
+    }
+
+    private fun explain(message: String) {
+        AlertDialog.Builder(this).setMessage(message).setPositiveButton(t("OK", "باشه"), null).show()
+    }
+
+    private fun detail(parent: LinearLayout, label: String, value: String) {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, dp(6)) }
+        row.addView(text(label, 12f, gray), LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(text(value, 12f, white, true))
+        parent.addView(row)
+    }
+
+    private fun text(value: String, size: Float, color: Int, bold: Boolean = false): TextView =
+        TextView(this).apply { text = value; textSize = size; setTextColor(color); if (bold) typeface = Typeface.DEFAULT_BOLD; gravity = if (fa) Gravity.RIGHT else Gravity.LEFT }
+
+    private fun button(label: String, action: () -> Unit): TextView =
+        TextView(this).apply {
+            text = label; textSize = 13f; setTextColor(white); gravity = Gravity.CENTER
+            background = panelDrawable(Color.argb(215, 150, 20, 38), 14, red, 1)
+            setPadding(dp(10), dp(12), dp(10), dp(12)); isClickable = true; isFocusable = true
+            setOnClickListener { animate().scaleX(0.97f).scaleY(0.97f).setDuration(70).withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(90).start(); action() }.start() }
+        }
+
+    private fun smallButton(label: String, action: () -> Unit): TextView =
+        TextView(this).apply { text = label; textSize = 11f; setTextColor(white); gravity = Gravity.CENTER; background = panelDrawable(Color.argb(150, 45, 31, 37), 10, Color.argb(120, red), 1); isClickable = true; setOnClickListener { action() } }
+
+    private fun panel(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
+        setPadding(dp(14), dp(13), dp(14), dp(13))
+        background = panelDrawable(Color.argb(178, 31, 24, 29), 18, Color.argb(110, 255, 55, 75), 1)
+        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(6), 0, dp(6)) }
     }
 
-    val scroll = ScrollView(this).apply {
-        isFillViewport = true
-        clipToPadding = false
-
-        addView(
-            content,
-            ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
+    private fun panelDrawable(color: Int, radius: Int, stroke: Int, width: Int) = GradientDrawable().apply {
+        setColor(color); cornerRadius = dp(radius).toFloat(); if (width > 0) setStroke(dp(width), stroke)
     }
 
-    root.addView(
-        scroll,
-        LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            0,
-            1f
-        )
-    )
-
-    createBottomNavigation()
-
-    when (currentTab) {
-        "Home" -> showHome()
-        "Configs" -> showConfigs()
-        "Settings" -> showSettings()
-    }
-}
-        private fun showHome() {
-        content.removeAllViews()
-
-        addText(
-            content,
-            "Your connection",
-            23f,
-            white,
-            true
-        )
-
-        addText(
-            content,
-            "Manage your private network connection.",
-            13f,
-            gray
-        )
-
-        addSpace(content, 22)
-
-        val connectionCard = createCard()
-        content.addView(connectionCard)
-
-        val statusIcon = ImageView(this).apply {
-            setImageResource(R.drawable.ic_shield)
-        }
-
-        connectionCard.addView(
-            statusIcon,
-            LinearLayout.LayoutParams(dp(54), dp(54))
-        )
-
-        addSpace(connectionCard, 12)
-
-        statusText = addText(
-            connectionCard,
-            if (connected) "CONNECTED" else "NOT CONNECTED",
-            19f,
-            if (connected) green else white,
-            true
-        )
-
-        addSpace(connectionCard, 6)
-
-        configSummary = addText(
-            connectionCard,
-            activeConfig,
-            13f,
-            gray
-        )
-
-        addSpace(connectionCard, 22)
-
-        connectButton = addText(
-            connectionCard,
-            if (connected) "DISCONNECT" else "CONNECT",
-            15f,
-            white,
-            true
-        ).apply {
-            gravity = Gravity.CENTER
-            background = roundedDrawable(red, 18)
-            setPadding(dp(20), dp(15), dp(20), dp(15))
-            isClickable = true
-            isFocusable = true
-
-            setOnClickListener {
-                toggleConnection()
-            }
-        }
-
-(connectButton.parent as? ViewGroup)?.removeView(connectButton)
-
-connectionCard.addView(
-    connectButton,
-    LinearLayout.LayoutParams(
-        LinearLayout.LayoutParams.MATCH_PARENT,
-        -2
-    )
-)
-
-        addSpace(content, 20)
-
-        addText(
-            content,
-            "CONNECTION DETAILS",
-            12f,
-            gray,
-            true
-        )
-
-        addSpace(content, 10)
-
-        val detailsCard = createCard()
-        content.addView(detailsCard)
-
-        addDetailRow(
-            detailsCard,
-            "Selected configuration",
-            activeConfig
-        )
-
-        addDivider(detailsCard)
-
-        addDetailRow(
-            detailsCard,
-            "Connection duration",
-            if (connected) "Session active" else "--"
-        )
-
-        addDivider(detailsCard)
-
-        addDetailRow(
-            detailsCard,
-            "Download speed",
-            "--"
-        )
-
-        addDivider(detailsCard)
-
-        addDetailRow(
-            detailsCard,
-            "Upload speed",
-            "--"
-        )
-
-        addDivider(detailsCard)
-
-        addDetailRow(
-            detailsCard,
-            "Latency",
-            "--"
-        )
-
-        addSpace(content, 16)
-
-        val notice = createCard()
-        content.addView(notice)
-
-        addText(
-            notice,
-            "Prototype mode",
-            15f,
-            red,
-            true
-        )
-
-        addSpace(notice, 6)
-
-        addText(
-            notice,
-            "This version contains the user interface only. " +
-                "A real VPN connection requires an Xray core " +
-                "and Android VPN service integration.",
-            12f,
-            gray
-        )
+    private fun space(parent: LinearLayout, height: Int) {
+        parent.addView(View(this), LinearLayout.LayoutParams(1, dp(height)))
     }
 
-    private fun toggleConnection() {
-        if (connected) {
-            connected = false
-            Toast.makeText(
-                this,
-                "Disconnected",
-                Toast.LENGTH_SHORT
-            ).show()
-        } else {
-            if (activeConfig == "No configuration selected") {
-                Toast.makeText(
-                    this,
-                    "Please select a configuration first",
-                    Toast.LENGTH_LONG
-                ).show()
-                return
-            }
-
-            Toast.makeText(
-                this,
-                "VPN core is not integrated yet",
-                Toast.LENGTH_LONG
-            ).show()
-
-            return
-        }
-
-        refreshScreen()
-    }
-
-    private fun addDetailRow(
-        parent: LinearLayout,
-        label: String,
-        value: String
-    ) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10), 0, dp(10))
-        }
-
-        val labelView = TextView(this).apply {
-            text = label
-            textSize = 12f
-            setTextColor(gray)
-        }
-
-        row.addView(
-            labelView,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        val valueView = TextView(this).apply {
-            text = value
-            textSize = 12f
-            setTextColor(white)
-            gravity = Gravity.END
-        }
-
-        row.addView(valueView)
-
-        parent.addView(
-            row,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                -2
-            )
-        )
-    }
-        private fun showConfigs() {
-        content.removeAllViews()
-
-        addText(content, "Configurations", 24f, white, true)
-        addText(
-            content,
-            "Manage your server configurations.",
-            13f,
-            gray
-        )
-
-        addSpace(content, 20)
-
-        val addButton = makeButton("+  Add Configuration")
-        content.addView(addButton)
-        addButton.setOnClickListener {
-            showAddConfigDialog()
-        }
-
-        addSpace(content, 12)
-
-        val clipboardButton = makeButton("Import from Clipboard")
-        content.addView(clipboardButton)
-        clipboardButton.setOnClickListener {
-            importFromClipboard()
-        }
-
-        addSpace(content, 20)
-
-        addText(content, "SAVED CONFIGURATIONS", 12f, gray, true)
-        addSpace(content, 10)
-
-        if (configs.isEmpty()) {
-            val emptyCard = createCard()
-            content.addView(emptyCard)
-
-            addText(
-                emptyCard,
-                "No configurations yet",
-                16f,
-                white,
-                true
-            )
-
-            addSpace(emptyCard, 6)
-
-            addText(
-                emptyCard,
-                "Add a configuration using its share link or text.",
-                12f,
-                gray
-            )
-        } else {
-            configs.forEach { config ->
-                val card = createCard()
-                content.addView(card)
-
-                val titleRow = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                }
-
-                card.addView(titleRow)
-
-                val name = TextView(this).apply {
-                    text = config
-                    textSize = 14f
-                    setTextColor(white)
-                    typeface = Typeface.DEFAULT_BOLD
-                }
-
-                titleRow.addView(
-                    name,
-                    LinearLayout.LayoutParams(0, -2, 1f)
-                )
-
-                if (config == activeConfig) {
-                    val selected = TextView(this).apply {
-                        text = "ACTIVE"
-                        textSize = 10f
-                        setTextColor(green)
-                    }
-                    titleRow.addView(selected)
-                }
-
-                addSpace(card, 12)
-
-                val actions = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                }
-
-                card.addView(actions)
-
-                val selectButton = smallButton(
-                    if (config == activeConfig) "Selected" else "Select"
-                )
-
-                actions.addView(
-                    selectButton,
-                    LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-                        setMargins(0, 0, dp(5), 0)
-                    }
-                )
-
-                selectButton.setOnClickListener {
-                    activeConfig = config
-                    refreshScreen()
-                }
-
-                val editButton = smallButton("Edit")
-
-                actions.addView(
-                    editButton,
-                    LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-                        setMargins(dp(5), 0, dp(5), 0)
-                    }
-                )
-
-                editButton.setOnClickListener {
-                    showEditConfigDialog(config)
-                }
-
-                val deleteButton = smallButton("Delete")
-
-                actions.addView(
-                    deleteButton,
-                    LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-                        setMargins(dp(5), 0, 0, 0)
-                    }
-                )
-
-                deleteButton.setOnClickListener {
-                    confirmDeleteConfig(config)
-                }
-            }
-        }
-
-        addSpace(content, 16)
-
-        val note = createCard()
-        content.addView(note)
-
-        addText(note, "Supported input", 14f, red, true)
-        addSpace(note, 6)
-
-        addText(
-            note,
-            "You can save configuration links or text here. " +
-                "Connecting to a server is not available until " +
-                "the VPN core is integrated.",
-            12f,
-            gray
-        )
-    }
-
-    private fun showAddConfigDialog() {
-        val input = EditText(this).apply {
-            hint = "Paste configuration link or text"
-            setHintTextColor(gray)
-            setTextColor(white)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = roundedDrawable(cardColor, 12)
-        }
-
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(8), dp(20), 0)
-            addView(
-                input,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(120)
-                )
-            )
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("Add Configuration")
-            .setView(container)
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Save") { _, _ ->
-                val value = input.text.toString().trim()
-
-                if (value.isNotEmpty()) {
-                    val name = "Config ${configs.size + 1}"
-                    configs.add("$name|$value")
-                    activeConfig = "$name|$value"
-                    refreshScreen()
-                } else {
-                    Toast.makeText(
-                        this,
-                        "Enter configuration text first",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-            .show()
-    }
-
-    private fun importFromClipboard() {
-        val clipboard = getSystemService(
-            Context.CLIPBOARD_SERVICE
-        ) as ClipboardManager
-
-        val clip = clipboard.primaryClip
-
-        val value = if (
-            clip != null && clip.itemCount > 0
-        ) {
-            clip.getItemAt(0).coerceToText(this).toString().trim()
-        } else {
-            ""
-        }
-
-        if (value.isBlank()) {
-            Toast.makeText(
-                this,
-                "Clipboard is empty",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-
-        val name = "Config ${configs.size + 1}"
-        configs.add("$name|$value")
-        activeConfig = "$name|$value"
-
-        Toast.makeText(
-            this,
-            "Configuration imported",
-            Toast.LENGTH_SHORT
-        ).show()
-
-        refreshScreen()
-    }
-
-    private fun showEditConfigDialog(config: String) {
-        val parts = config.split("|", limit = 2)
-        val oldName = parts.getOrElse(0) { "Config" }
-        val oldValue = parts.getOrElse(1) { "" }
-
-        val input = EditText(this).apply {
-            setText(oldValue)
-            setTextColor(white)
-            setHintTextColor(gray)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = roundedDrawable(cardColor, 12)
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("Edit Configuration")
-            .setView(input)
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Save") { _, _ ->
-                val newValue = input.text.toString().trim()
-
-                if (newValue.isNotEmpty()) {
-                    val updated = "$oldName|$newValue"
-                    val index = configs.indexOf(config)
-
-                    if (index >= 0) {
-                        configs[index] = updated
-                    }
-
-                    if (activeConfig == config) {
-                        activeConfig = updated
-                    }
-
-                    refreshScreen()
-                }
-            }
-            .show()
-    }
-
-    private fun confirmDeleteConfig(config: String) {
-        AlertDialog.Builder(this)
-            .setTitle("Delete Configuration")
-            .setMessage("Are you sure you want to delete this configuration?")
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Delete") { _, _ ->
-                configs.remove(config)
-
-                if (activeConfig == config) {
-                    activeConfig = "No configuration selected"
-                }
-
-                refreshScreen()
-            }
-            .show()
-    }
-        private fun showSettings() {
-        content.removeAllViews()
-
-        addText(content, "Settings", 24f, white, true)
-        addText(content, "Customize Spider Client.", 13f, gray)
-
-        addSpace(content, 20)
-
-        addSettingsSection("GENERAL")
-
-        addSettingsItem(
-            "Language",
-            "English",
-            R.drawable.ic_language
-        ) {
-            AlertDialog.Builder(this)
-                .setTitle("Select Language")
-                .setItems(arrayOf("English", "فارسی")) { _, which ->
-                    Toast.makeText(
-                        this,
-                        if (which == 0) "English selected" else "فارسی انتخاب شد",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                .show()
-        }
-
-        addSettingsItem(
-            "Appearance",
-            "Dark theme",
-            R.drawable.ic_theme
-        ) {
-            Toast.makeText(
-                this,
-                "Dark theme is currently enabled",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-
-        addSettingsItem(
-            "Device ID",
-            "Copy device identifier",
-            R.drawable.ic_info
-        ) {
-            val deviceId = android.provider.Settings.Secure.getString(
-                contentResolver,
-                android.provider.Settings.Secure.ANDROID_ID
-            ) ?: "Unavailable"
-
-            val clipboard = getSystemService(
-                Context.CLIPBOARD_SERVICE
-            ) as ClipboardManager
-
-            clipboard.setPrimaryClip(
-                ClipData.newPlainText("Device ID", deviceId)
-            )
-
-            Toast.makeText(
-                this,
-                "Device ID copied",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-
-        addSpace(content, 16)
-        addSettingsSection("NETWORK")
-
-        addSettingsItem(
-            "DNS",
-            "Coming soon",
-            R.drawable.ic_settings
-        ) {
-            showComingSoon()
-        }
-
-        addSettingsItem(
-            "Routing",
-            "Coming soon",
-            R.drawable.ic_configs
-        ) {
-            showComingSoon()
-        }
-
-        addSettingsItem(
-            "IPv6",
-            "Coming soon",
-            R.drawable.ic_settings
-        ) {
-            showComingSoon()
-        }
-
-        addSettingsItem(
-            "VPN mode",
-            "Not integrated",
-            R.drawable.ic_shield
-        ) {
-            showComingSoon()
-        }
-
-        addSettingsItem(
-            "Connection logs",
-            "Coming soon",
-            R.drawable.ic_info
-        ) {
-            showComingSoon()
-        }
-
-        addSpace(content, 16)
-        addSettingsSection("ABOUT")
-
-        addSettingsItem(
-            "App version",
-            "1.0.0",
-            R.drawable.ic_info
-        ) {
-            AlertDialog.Builder(this)
-                .setTitle("Spider Client")
-                .setMessage(
-                    "Version 1.0.0\n\n" +
-                    "A VPN client interface prototype."
-                )
-                .setPositiveButton("OK", null)
-                .show()
-        }
-
-        addSettingsItem(
-            "Backup configurations",
-            "Export saved configurations",
-            R.drawable.ic_backup
-        ) {
-            exportConfigs()
-        }
-
-        addSettingsItem(
-            "Privacy policy",
-            "Privacy information",
-            R.drawable.ic_lock
-        ) {
-            AlertDialog.Builder(this)
-                .setTitle("Privacy Policy")
-                .setMessage(
-                    "This prototype stores configuration data " +
-                    "in memory during the current app session. " +
-                    "Persistent storage and VPN functionality " +
-                    "have not yet been implemented."
-                )
-                .setPositiveButton("OK", null)
-                .show()
-        }
-
-        addSettingsItem(
-            "Subscribe Info",
-            "Coming soon",
-            R.drawable.ic_refresh
-        ) {
-            showComingSoon()
-        }
-    }
-
-    private fun addSettingsSection(title: String) {
-        addText(content, title, 12f, red, true)
-        addSpace(content, 8)
-    }
-
-    private fun addSettingsItem(
-        title: String,
-        subtitle: String,
-        iconRes: Int,
-        action: () -> Unit
-    ) {
-        val card = createCard().apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            isClickable = true
-            setOnClickListener { action() }
-        }
-
-        content.addView(
-            card,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                -2
-            ).apply {
-                setMargins(0, 0, 0, dp(8))
-            }
-        )
-
-        val icon = ImageView(this).apply {
-            setImageResource(iconRes)
-        }
-
-        card.addView(
-            icon,
-            LinearLayout.LayoutParams(dp(28), dp(28))
-        )
-
-        val labels = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), 0, dp(8), 0)
-        }
-
-        labels.addView(
-            TextView(this).apply {
-                text = title
-                textSize = 14f
-                setTextColor(white)
-            }
-        )
-
-        labels.addView(
-            TextView(this).apply {
-                text = subtitle
-                textSize = 11f
-                setTextColor(gray)
-            }
-        )
-
-        card.addView(
-            labels,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        card.addView(
-            TextView(this).apply {
-                text = "›"
-                textSize = 25f
-                setTextColor(gray)
-            }
-        )
-    }
-
-    private fun exportConfigs() {
-        if (configs.isEmpty()) {
-            Toast.makeText(
-                this,
-                "There are no configurations to export",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-
-        val text = configs.joinToString("\n\n") {
-            it.substringAfter("|", it)
-        }
-
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Spider Client Configurations")
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-
-        startActivity(
-            Intent.createChooser(intent, "Export configurations")
-        )
-    }
-
-    private fun showComingSoon() {
-        Toast.makeText(
-            this,
-            "This feature is not implemented yet",
-            Toast.LENGTH_SHORT
-        ).show()
-    }
-
-    private fun createCard(): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = roundedDrawable(cardColor, 20)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                -2
-            ).apply {
-                setMargins(0, 0, 0, dp(12))
-            }
-        }
-    }
-
-    private fun addText(
-        parent: LinearLayout,
-        value: String,
-        size: Float,
-        color: Int,
-        bold: Boolean = false
-    ): TextView {
-        val textView = TextView(this).apply {
-            text = value
-            textSize = size
-            setTextColor(color)
-
-            if (bold) {
-                typeface = Typeface.DEFAULT_BOLD
-            }
-        }
-
-        parent.addView(
-            textView,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                -2
-            )
-        )
-
-        return textView
-    }
-
-    private fun addSpace(parent: LinearLayout, height: Int) {
-        parent.addView(
-            View(this),
-            LinearLayout.LayoutParams(
-                1,
-                dp(height)
-            )
-        )
-    }
-
-    private fun addDivider(parent: LinearLayout) {
-        parent.addView(
-            View(this).apply {
-                setBackgroundColor(Color.rgb(55, 55, 60))
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(1)
-            )
-        )
-    }
-
-    private fun makeButton(label: String): TextView {
-        return TextView(this).apply {
-            text = label
-            textSize = 14f
-            setTextColor(white)
-            gravity = Gravity.CENTER
-            background = roundedDrawable(red, 14)
-            setPadding(dp(12), dp(14), dp(12), dp(14))
-        }
-    }
-
-    private fun smallButton(label: String): TextView {
-        return TextView(this).apply {
-            text = label
-            textSize = 12f
-            setTextColor(white)
-            gravity = Gravity.CENTER
-            background = roundedDrawable(
-                Color.rgb(48, 35, 39),
-                10
-            )
-        }
-    }
-
-    private fun roundedDrawable(
-        color: Int,
-        radius: Int
-    ): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radius).toFloat()
-        }
-    }
-
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
+    private fun pingColor(value: String): Int = when {
+        value.contains("ms") -> red
+        value.contains("Timeout", true) || value.contains("مهلت") -> Color.YELLOW
+        else -> gray
     }
 }
